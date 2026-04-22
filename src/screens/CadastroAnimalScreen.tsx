@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  Alert, ScrollView, ActivityIndicator,
+  ScrollView, ActivityIndicator, Modal,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
@@ -11,6 +11,8 @@ type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'CadastroAnimal'>;
 };
 
+type Aviso = { tipo: 'sucesso' | 'erro' | 'atencao'; mensagem: string } | null;
+
 export default function CadastroAnimalScreen({ navigation }: Props) {
   const [brinco, setBrinco] = useState('');
   const [nome, setNome] = useState('');
@@ -19,11 +21,16 @@ export default function CadastroAnimalScreen({ navigation }: Props) {
   const [tipo, setTipo] = useState('');
   const [statusLeite, setStatusLeite] = useState('Produzindo');
   const [salvando, setSalvando] = useState(false);
+  const [aviso, setAviso] = useState<Aviso>(null);
+
+  function mostrarAviso(tipo: 'sucesso' | 'erro' | 'atencao', mensagem: string) {
+    setAviso({ tipo, mensagem });
+  }
 
   async function handleSalvar() {
     if (salvando) return;
     if (!brinco.trim() || !raca.trim() || !tipo.trim()) {
-      Alert.alert('Atenção', 'Preencha os campos obrigatórios: Brinco, Raça e Tipo.');
+      mostrarAviso('atencao', 'Preencha os campos obrigatórios: Brinco, Raça e Tipo.');
       return;
     }
 
@@ -43,125 +50,149 @@ export default function CadastroAnimalScreen({ navigation }: Props) {
         }),
       });
 
-      const resultado = await response.json();
-
-      if (resultado.sucesso) {
-        Alert.alert('Sucesso!', 'Animal cadastrado com sucesso!', [
-          { text: 'OK', onPress: () => navigation.goBack() },
-        ]);
+      if (response.ok) {
+        mostrarAviso('sucesso', 'Animal cadastrado com sucesso!');
       } else {
-        Alert.alert('Erro', resultado.mensagem ?? 'Não foi possível salvar.');
+        const erro = await response.json();
+        mostrarAviso('erro', erro.mensagem ?? 'Não foi possível salvar.');
       }
     } catch {
-      Alert.alert('Erro', 'Não foi possível conectar à API. Verifique se o dotnet run está rodando.');
+      mostrarAviso('erro', 'Não foi possível conectar à API.\nVerifique se o dotnet run está rodando.');
     } finally {
       setSalvando(false);
     }
   }
 
+  const corAviso = aviso?.tipo === 'sucesso'
+    ? '#2d6a4f'
+    : aviso?.tipo === 'atencao'
+    ? '#e07b00'
+    : '#c0392b';
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.cabecalho}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.voltar}>
-          <Text style={styles.voltarTexto}>← Voltar</Text>
-        </TouchableOpacity>
-        <Text style={styles.titulo}>Cadastrar Animal</Text>
-      </View>
-
-      <View style={styles.form}>
-        {/* Brinco */}
-        <Text style={styles.label}>Brinco <Text style={styles.obrigatorio}>*</Text></Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Ex: BR-006"
-          placeholderTextColor="#bbb"
-          autoCapitalize="characters"
-          value={brinco}
-          onChangeText={setBrinco}
-        />
-
-        {/* Nome */}
-        <Text style={styles.label}>Nome</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Ex: Mimosa"
-          placeholderTextColor="#bbb"
-          value={nome}
-          onChangeText={setNome}
-        />
-
-        {/* Raça */}
-        <Text style={styles.label}>Raça <Text style={styles.obrigatorio}>*</Text></Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Ex: Holandesa, Nelore, Girolando"
-          placeholderTextColor="#bbb"
-          value={raca}
-          onChangeText={setRaca}
-        />
-
-        {/* Tipo */}
-        <Text style={styles.label}>Tipo <Text style={styles.obrigatorio}>*</Text></Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Ex: Vaca, Touro, Novilha, Bezerro"
-          placeholderTextColor="#bbb"
-          value={tipo}
-          onChangeText={setTipo}
-        />
-
-        {/* Sexo */}
-        <Text style={styles.label}>Sexo</Text>
-        <View style={styles.grupo}>
-          <TouchableOpacity
-            style={[styles.opcao, sexo === 'F' && styles.opcaoSelecionada]}
-            onPress={() => setSexo('F')}
-          >
-            <Text style={[styles.opcaoTexto, sexo === 'F' && styles.opcaoTextoSelecionado]}>
-              🐄 Fêmea
-            </Text>
+    <View style={{ flex: 1 }}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <View style={styles.cabecalho}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.voltar}>
+            <Text style={styles.voltarTexto}>← Voltar</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.opcao, sexo === 'M' && styles.opcaoSelecionada]}
-            onPress={() => setSexo('M')}
-          >
-            <Text style={[styles.opcaoTexto, sexo === 'M' && styles.opcaoTextoSelecionado]}>
-              🐂 Macho
-            </Text>
-          </TouchableOpacity>
+          <Text style={styles.titulo}>Cadastrar Animal</Text>
         </View>
 
-        {/* Status do Leite — só para fêmeas */}
-        {sexo === 'F' && (
-          <>
-            <Text style={styles.label}>Status do Leite</Text>
-            <View style={styles.grupo}>
-              {['Produzindo', 'Seca', 'Gestante'].map((s) => (
-                <TouchableOpacity
-                  key={s}
-                  style={[styles.opcao, statusLeite === s && styles.opcaoSelecionada]}
-                  onPress={() => setStatusLeite(s)}
-                >
-                  <Text style={[styles.opcaoTexto, statusLeite === s && styles.opcaoTextoSelecionado]}>
-                    {s}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </>
-        )}
+        <View style={styles.form}>
+          <Text style={styles.label}>Brinco <Text style={styles.obrigatorio}>*</Text></Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Ex: BR-006"
+            placeholderTextColor="#bbb"
+            autoCapitalize="characters"
+            value={brinco}
+            onChangeText={setBrinco}
+          />
 
-        <TouchableOpacity
-          style={[styles.botao, salvando && styles.botaoDesabilitado]}
-          onPress={handleSalvar}
-        >
-          {salvando
-            ? <ActivityIndicator color="#fff" />
-            : <Text style={styles.botaoTexto}>Salvar Animal</Text>
-          }
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+          <Text style={styles.label}>Nome</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Ex: Mimosa"
+            placeholderTextColor="#bbb"
+            value={nome}
+            onChangeText={setNome}
+          />
+
+          <Text style={styles.label}>Raça <Text style={styles.obrigatorio}>*</Text></Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Ex: Holandesa, Nelore, Girolando"
+            placeholderTextColor="#bbb"
+            value={raca}
+            onChangeText={setRaca}
+          />
+
+          <Text style={styles.label}>Tipo <Text style={styles.obrigatorio}>*</Text></Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Ex: Vaca, Touro, Novilha, Bezerro"
+            placeholderTextColor="#bbb"
+            value={tipo}
+            onChangeText={setTipo}
+          />
+
+          <Text style={styles.label}>Sexo</Text>
+          <View style={styles.grupo}>
+            <TouchableOpacity
+              style={[styles.opcao, sexo === 'F' && styles.opcaoSelecionada]}
+              onPress={() => setSexo('F')}
+            >
+              <Text style={[styles.opcaoTexto, sexo === 'F' && styles.opcaoTextoSelecionado]}>
+                🐄 Fêmea
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.opcao, sexo === 'M' && styles.opcaoSelecionada]}
+              onPress={() => setSexo('M')}
+            >
+              <Text style={[styles.opcaoTexto, sexo === 'M' && styles.opcaoTextoSelecionado]}>
+                🐂 Macho
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {sexo === 'F' && (
+            <>
+              <Text style={styles.label}>Status do Leite</Text>
+              <View style={styles.grupo}>
+                {['Produzindo', 'Seca', 'Gestante'].map((s) => (
+                  <TouchableOpacity
+                    key={s}
+                    style={[styles.opcao, statusLeite === s && styles.opcaoSelecionada]}
+                    onPress={() => setStatusLeite(s)}
+                  >
+                    <Text style={[styles.opcaoTexto, statusLeite === s && styles.opcaoTextoSelecionado]}>
+                      {s}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </>
+          )}
+
+          <TouchableOpacity
+            style={[styles.botao, salvando && styles.botaoDesabilitado]}
+            onPress={handleSalvar}
+          >
+            {salvando
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={styles.botaoTexto}>Salvar Animal</Text>
+            }
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+
+      {/* Modal de aviso */}
+      <Modal visible={aviso !== null} transparent animationType="fade">
+        <View style={styles.modalFundo}>
+          <View style={[styles.modalCaixa, { borderTopColor: corAviso }]}>
+            <Text style={[styles.modalTitulo, { color: corAviso }]}>
+              {aviso?.tipo === 'sucesso' ? '✓ Sucesso' : aviso?.tipo === 'atencao' ? '⚠ Atenção' : '✕ Erro'}
+            </Text>
+            <Text style={styles.modalMensagem}>{aviso?.mensagem}</Text>
+            <TouchableOpacity
+              style={[styles.modalBotao, { backgroundColor: corAviso }]}
+              onPress={() => {
+                if (aviso?.tipo === 'sucesso') {
+                  setAviso(null);
+                  navigation.navigate('Home');
+                } else {
+                  setAviso(null);
+                }
+              }}
+            >
+              <Text style={styles.modalBotaoTexto}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 }
 
@@ -210,4 +241,30 @@ const styles = StyleSheet.create({
   },
   botaoDesabilitado: { backgroundColor: '#7aab95' },
   botaoTexto: { color: '#fff', fontWeight: '700', fontSize: 16 },
+
+  // Modal
+  modalFundo: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  modalCaixa: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 28,
+    width: '100%',
+    maxWidth: 340,
+    alignItems: 'center',
+    borderTopWidth: 5,
+  },
+  modalTitulo: { fontSize: 18, fontWeight: '800', marginBottom: 12 },
+  modalMensagem: { fontSize: 15, color: '#444', textAlign: 'center', marginBottom: 24, lineHeight: 22 },
+  modalBotao: {
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 48,
+  },
+  modalBotaoTexto: { color: '#fff', fontWeight: '700', fontSize: 15 },
 });
