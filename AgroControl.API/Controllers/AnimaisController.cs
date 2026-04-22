@@ -70,4 +70,38 @@ public class AnimaisController : ControllerBase
 
         return Ok(new { sucesso = true, mensagem = "Animal cadastrado com sucesso!", id = animal.Id });
     }
+
+    // PUT /api/animais/{id}
+    [HttpPut("{id}")]
+    public async Task<IActionResult> Atualizar(int id, [FromBody] CadastrarAnimalDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Raca) || string.IsNullOrWhiteSpace(dto.Tipo))
+            return BadRequest(new { sucesso = false, mensagem = "Raça e Tipo são obrigatórios." });
+
+        var animal = await _db.Animais.FindAsync(id);
+        if (animal is null)
+            return NotFound(new { sucesso = false, mensagem = "Animal não encontrado." });
+
+        animal.Nome = dto.Nome?.Trim();
+        animal.Raca = dto.Raca.Trim();
+        animal.Sexo = dto.Sexo;
+        animal.Tipo = dto.Tipo.Trim();
+        animal.StatusLeite = dto.Sexo == "F" ? dto.StatusLeite : "N/A";
+
+        await _db.SaveChangesAsync();
+        return Ok(new { sucesso = true, mensagem = "Animal atualizado com sucesso!" });
+    }
+
+    // DELETE /api/animais/{id}
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Excluir(int id)
+    {
+        var animal = await _db.Animais.FindAsync(id);
+        if (animal is null)
+            return NotFound(new { sucesso = false, mensagem = "Animal não encontrado." });
+
+        _db.Animais.Remove(animal);
+        await _db.SaveChangesAsync();
+        return Ok(new { sucesso = true, mensagem = "Animal excluído com sucesso!" });
+    }
 }
