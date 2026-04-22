@@ -39,3 +39,8 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# ASP.NET Core / C#
+AgroControl.API/bin/
+AgroControl.API/obj/
+AgroControl.API/*.user

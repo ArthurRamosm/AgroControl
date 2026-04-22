@@ -6,7 +6,8 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "server": "json-server --watch db.json --port 3000 --host 0.0.0.0"
   },
   "dependencies": {
     "@react-navigation/native": "^7.2.1",

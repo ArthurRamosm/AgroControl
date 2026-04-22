@@ -1,0 +1,33 @@
+{
+  "usuarios": [
+    { "id": 1, "usuario": "admin", "senha": "1234", "propriedade": "Fazenda São João" },
+    { "id": 2, "usuario": "joao",  "senha": "abcd", "propriedade": "Sítio Boa Vista" }
+  ],
+  "animais": [
+    { "id": 1, "brinco": "BR-001", "nome": "Mimosa",    "raca": "Holandesa", "sexo": "F", "tipo": "Vaca",    "status_leite": "Produzindo", "ativo": true,  "usuarioId": 1 },
+    { "id": 2, "brinco": "BR-002", "nome": "Pintada",   "raca": "Girolando", "sexo": "F", "tipo": "Vaca",    "status_leite": "Seca",       "ativo": true,  "usuarioId": 1 },
+    { "id": 3, "brinco": "BR-003", "nome": "Touro Rex", "raca": "Nelore",    "sexo": "M", "tipo": "Touro",   "status_leite": "N/A",        "ativo": true,  "usuarioId": 1 },
+    { "id": 4, "brinco": "BR-004", "nome": "Estrela",   "raca": "Jersey",    "sexo": "F", "tipo": "Vaca",    "status_leite": "Produzindo", "ativo": true,  "usuarioId": 1 },
+    { "id": 5, "brinco": "BR-005", "nome": "Belinha",   "raca": "Holandesa", "sexo": "F", "tipo": "Novilha", "status_leite": "Seca",       "ativo": false, "usuarioId": 1 }
+  ],
+  "animal_imagens": [
+    { "id": 1, "animalId": 1, "url": "https://via.placeholder.com/200", "descricao": "Foto principal" }
+  ],
+  "pesagens": [
+    { "id": 1, "animalId": 1, "peso": 480.5, "data": "2025-03-10" },
+    { "id": 2, "animalId": 2, "peso": 420.0, "data": "2025-03-10" },
+    { "id": 3, "animalId": 3, "peso": 750.0, "data": "2025-03-10" }
+  ],
+  "vacinacoes": [
+    { "id": 1, "animalId": 1, "vacina": "Febre Aftosa", "data": "2025-06-01", "proxima_dose": "2025-12-01", "status": "pendente" },
+    { "id": 2, "animalId": 2, "vacina": "Brucelose",    "data": "2025-03-15", "proxima_dose": "2026-03-15", "status": "pendente" },
+    { "id": 3, "animalId": 4, "vacina": "Raiva",        "data": "2025-09-10", "proxima_dose": "2026-09-10", "status": "em_dia"  }
+  ],
+  "reproducoes": [
+    { "id": 1, "animalId": 2, "tipo": "Inseminação", "data": "2025-04-05", "resultado": "Prenha" },
+    { "id": 2, "animalId": 4, "tipo": "Cobertura",   "data": "2025-02-20", "resultado": "Aguardando" }
+  ],
+  "baixas": [
+    { "id": 1, "animalId": 5, "motivo": "Venda", "data": "2025-08-01", "observacao": "Vendida para terceiros" }
+  ]
+}

@@ -1,28 +1,49 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, Alert, KeyboardAvoidingView, Platform,
+  StyleSheet, Alert, KeyboardAvoidingView, Platform, ActivityIndicator,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
+import { API_URL } from '../config/api';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Login'>;
 };
 
-// Usuário fixo (sem backend por enquanto)
-const USUARIO_FIXO = 'admin';
-const SENHA_FIXA = '1234';
-
 export default function LoginScreen({ navigation }: Props) {
   const [usuario, setUsuario] = useState('');
   const [senha, setSenha] = useState('');
+  const [carregando, setCarregando] = useState(false);
 
-  function handleLogin() {
-    if (usuario === USUARIO_FIXO && senha === SENHA_FIXA) {
-      navigation.replace('Home');
-    } else {
-      Alert.alert('Erro', 'Usuário ou senha incorretos!');
+  async function handleLogin() {
+    if (carregando) return;
+    if (!usuario.trim() || !senha.trim()) {
+      Alert.alert('Atenção', 'Preencha usuário e senha.');
+      return;
+    }
+    setCarregando(true);
+    try {
+      const response = await fetch(`${API_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usuario: usuario.trim(), senha: senha.trim() }),
+      });
+
+      const resultado = await response.json();
+
+      if (resultado.sucesso) {
+        navigation.replace('Home');
+      } else {
+        Alert.alert('Erro', resultado.mensagem ?? 'Usuário ou senha incorretos!');
+      }
+    } catch {
+      Alert.alert(
+        'Erro de conexão',
+        'Não foi possível conectar à API.\nVerifique se o dotnet run está rodando.'
+      );
+    } finally {
+      setCarregando(false);
     }
   }
 
@@ -53,11 +74,15 @@ export default function LoginScreen({ navigation }: Props) {
           onChangeText={setSenha}
         />
 
-        <TouchableOpacity style={styles.botao} onPress={handleLogin}>
-          <Text style={styles.botaoTexto}>Entrar</Text>
+        <TouchableOpacity
+          style={[styles.botao, carregando && styles.botaoDesabilitado]}
+          onPress={handleLogin}
+        >
+          {carregando
+            ? <ActivityIndicator color="#fff" />
+            : <Text style={styles.botaoTexto}>Entrar</Text>
+          }
         </TouchableOpacity>
-
-        <Text style={styles.dica}>Usuário: admin | Senha: 1234</Text>
       </View>
     </KeyboardAvoidingView>
   );
@@ -100,6 +125,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 4,
   },
+  botaoDesabilitado: { backgroundColor: '#7aab95' },
   botaoTexto: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  dica: { marginTop: 20, color: '#aaa', fontSize: 12 },
 });
