@@ -1,40 +1,25 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using AgroControl.API.Data;
 using AgroControl.API.DTOs;
-using AgroControl.API.Models;
+using AgroControl.API.Services;
 
 namespace AgroControl.API.Controllers;
 
 [ApiController]
 [Route("api/animais")]
-public class AnimaisController : ControllerBase
+public class AnimaisController(AnimaisService service, ILogger<AnimaisController> logger) : ControllerBase
 {
-    private readonly AppDbContext _db;
+    private readonly AnimaisService _service = service;
+    private readonly ILogger<AnimaisController> _logger = logger;
 
-    public AnimaisController(AppDbContext db)
-    {
-        _db = db;
-    }
-
-    // GET /api/animais
+    // GET /api/animais?propriedadeId=1
     [HttpGet]
-    public async Task<IActionResult> Listar()
+    public async Task<IActionResult> Listar([FromQuery] int propriedadeId)
     {
-        var animais = await _db.Animais
-            .Select(a => new AnimalResponseDto
-            {
-                Id = a.Id,
-                Brinco = a.Brinco,
-                Nome = a.Nome,
-                Raca = a.Raca,
-                Sexo = a.Sexo,
-                Tipo = a.Tipo,
-                StatusLeite = a.StatusLeite,
-                Ativo = a.Ativo
-            })
-            .ToListAsync();
+        if (propriedadeId <= 0)
+            return BadRequest(new { sucesso = false, mensagem = "ID da propriedade é obrigatório." });
 
+        _logger.LogInformation("Listando animais da propriedade {PropriedadeId}", propriedadeId);
+        var animais = await _service.ListarAsync(propriedadeId);
         return Ok(animais);
     }
 
@@ -42,66 +27,53 @@ public class AnimaisController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Cadastrar([FromBody] CadastrarAnimalDto dto)
     {
-        if (string.IsNullOrWhiteSpace(dto.Brinco) ||
-            string.IsNullOrWhiteSpace(dto.Raca) ||
-            string.IsNullOrWhiteSpace(dto.Tipo))
-        {
-            return BadRequest(new { sucesso = false, mensagem = "Brinco, Raça e Tipo são obrigatórios." });
-        }
+        if (!ModelState.IsValid)
+            return BadRequest(new { sucesso = false, mensagem = PrimeiraMensagemErro() });
 
-        var brincoExiste = await _db.Animais.AnyAsync(a => a.Brinco == dto.Brinco.ToUpper());
-        if (brincoExiste)
-            return Conflict(new { sucesso = false, mensagem = $"Já existe um animal com o brinco {dto.Brinco}." });
+        _logger.LogInformation("Cadastrando animal {Brinco} na propriedade {PropriedadeId}", dto.Brinco, dto.PropriedadeId);
+        var (sucesso, mensagem, id) = await _service.CadastrarAsync(dto);
+        if (!sucesso)
+            return Conflict(new { sucesso = false, mensagem });
 
-        var animal = new Animal
-        {
-            Brinco = dto.Brinco.ToUpper(),
-            Nome = dto.Nome?.Trim(),
-            Raca = dto.Raca.Trim(),
-            Sexo = dto.Sexo,
-            Tipo = dto.Tipo.Trim(),
-            StatusLeite = dto.Sexo == "F" ? dto.StatusLeite : "N/A",
-            Ativo = true,
-            PropriedadeId = dto.PropriedadeId
-        };
-
-        _db.Animais.Add(animal);
-        await _db.SaveChangesAsync();
-
-        return Ok(new { sucesso = true, mensagem = "Animal cadastrado com sucesso!", id = animal.Id });
+        return Ok(new { sucesso = true, mensagem, id });
     }
 
-    // PUT /api/animais/{id}
+    // PUT /api/animais/{id}?propriedadeId=1
     [HttpPut("{id}")]
-    public async Task<IActionResult> Atualizar(int id, [FromBody] CadastrarAnimalDto dto)
+    public async Task<IActionResult> Atualizar(int id, [FromQuery] int propriedadeId, [FromBody] CadastrarAnimalDto dto)
     {
-        if (string.IsNullOrWhiteSpace(dto.Raca) || string.IsNullOrWhiteSpace(dto.Tipo))
-            return BadRequest(new { sucesso = false, mensagem = "Raça e Tipo são obrigatórios." });
+        if (!ModelState.IsValid)
+            return BadRequest(new { sucesso = false, mensagem = PrimeiraMensagemErro() });
 
-        var animal = await _db.Animais.FindAsync(id);
-        if (animal is null)
-            return NotFound(new { sucesso = false, mensagem = "Animal não encontrado." });
+        if (propriedadeId <= 0)
+            return BadRequest(new { sucesso = false, mensagem = "ID da propriedade é obrigatório." });
 
-        animal.Nome = dto.Nome?.Trim();
-        animal.Raca = dto.Raca.Trim();
-        animal.Sexo = dto.Sexo;
-        animal.Tipo = dto.Tipo.Trim();
-        animal.StatusLeite = dto.Sexo == "F" ? dto.StatusLeite : "N/A";
+        _logger.LogInformation("Atualizando animal {Id} da propriedade {PropriedadeId}", id, propriedadeId);
+        var (sucesso, mensagem) = await _service.AtualizarAsync(id, propriedadeId, dto);
+        if (!sucesso)
+            return NotFound(new { sucesso = false, mensagem });
 
-        await _db.SaveChangesAsync();
-        return Ok(new { sucesso = true, mensagem = "Animal atualizado com sucesso!" });
+        return Ok(new { sucesso = true, mensagem });
     }
 
-    // DELETE /api/animais/{id}
+    // DELETE /api/animais/{id}?propriedadeId=1
     [HttpDelete("{id}")]
-    public async Task<IActionResult> Excluir(int id)
+    public async Task<IActionResult> Excluir(int id, [FromQuery] int propriedadeId)
     {
-        var animal = await _db.Animais.FindAsync(id);
-        if (animal is null)
-            return NotFound(new { sucesso = false, mensagem = "Animal não encontrado." });
+        if (propriedadeId <= 0)
+            return BadRequest(new { sucesso = false, mensagem = "ID da propriedade é obrigatório." });
 
-        _db.Animais.Remove(animal);
-        await _db.SaveChangesAsync();
-        return Ok(new { sucesso = true, mensagem = "Animal excluído com sucesso!" });
+        _logger.LogInformation("Excluindo animal {Id} da propriedade {PropriedadeId}", id, propriedadeId);
+        var (sucesso, mensagem) = await _service.ExcluirAsync(id, propriedadeId);
+        if (!sucesso)
+            return NotFound(new { sucesso = false, mensagem });
+
+        return Ok(new { sucesso = true, mensagem });
     }
+
+    private string PrimeiraMensagemErro() =>
+        ModelState.Values
+            .SelectMany(v => v.Errors)
+            .Select(e => e.ErrorMessage)
+            .FirstOrDefault() ?? "Dados inválidos.";
 }

@@ -6,8 +6,8 @@ public class Animal
     public string Brinco { get; set; } = string.Empty;
     public string? Nome { get; set; }
     public string Raca { get; set; } = string.Empty;
-    public string Sexo { get; set; } = string.Empty;       // "M" ou "F"
-    public string Tipo { get; set; } = string.Empty;       // Vaca, Touro, Novilha...
+    public string Sexo { get; set; } = string.Empty;       
+    public string Tipo { get; set; } = string.Empty;      
     public string StatusLeite { get; set; } = "N/A";
     public bool Ativo { get; set; } = true;
 

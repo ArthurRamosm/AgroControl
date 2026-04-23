@@ -11,6 +11,7 @@ export type AnimalParams = {
 
 export type RootStackParamList = {
   Login: undefined;
+  Register: undefined;
   Home: undefined;
   AnimalList: undefined;
   CadastroAnimal: { animal?: AnimalParams } | undefined;

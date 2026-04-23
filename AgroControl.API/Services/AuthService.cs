@@ -32,7 +32,7 @@ public class AuthService
         return new LoginResponseDto
         {
             Sucesso = true,
-            Nome = usuario.NomeUsuario,
+            Nome = string.IsNullOrWhiteSpace(usuario.Nome) ? usuario.NomeUsuario : usuario.Nome,
             PropriedadeId = usuario.PropriedadeId
         };
     }

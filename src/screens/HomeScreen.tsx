@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
+  View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
-import { API_URL } from '../config/api';
+import { api, getMensagemErro } from '../config/api';
+import { getSession, clearSession } from '../services/session';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Home'>;
@@ -15,15 +16,18 @@ export default function HomeScreen({ navigation }: Props) {
   const [vacinasPendentes, setVacinasPendentes] = useState<number | null>(null);
   const [carregando, setCarregando] = useState(true);
 
+  const session = getSession();
+
   useEffect(() => {
     async function carregarDados() {
       try {
-        const resAnimais = await fetch(`${API_URL}/api/animais`);
-        const animais = await resAnimais.json();
-        const ativos = animais.filter((a: { ativo: boolean }) => a.ativo);
-        setTotalAnimais(ativos.length);
+        const animais = await api.get<{ ativo: boolean }[]>(
+          `/api/animais?propriedadeId=${session.propriedadeId}`
+        );
+        setTotalAnimais(animais.filter(a => a.ativo).length);
         setVacinasPendentes(0);
-      } catch {
+      } catch (error) {
+        Alert.alert('Aviso', getMensagemErro(error));
         setTotalAnimais(0);
         setVacinasPendentes(0);
       } finally {
@@ -33,10 +37,15 @@ export default function HomeScreen({ navigation }: Props) {
     carregarDados();
   }, []);
 
+  function handleSair() {
+    clearSession();
+    navigation.replace('Login');
+  }
+
   return (
     <View style={styles.container}>
       <Text style={styles.emoji}>🐄</Text>
-      <Text style={styles.titulo}>Bem-vindo ao AgroControl</Text>
+      <Text style={styles.titulo}>Bem-vindo, {session.nome}!</Text>
       <Text style={styles.subtitulo}>Painel principal do rebanho</Text>
 
       {carregando ? (
@@ -70,7 +79,7 @@ export default function HomeScreen({ navigation }: Props) {
         <Text style={styles.botaoSecundarioTexto}>Ver Rebanho</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.sair} onPress={() => navigation.replace('Login')}>
+      <TouchableOpacity style={styles.sair} onPress={handleSair}>
         <Text style={styles.sairTexto}>Sair</Text>
       </TouchableOpacity>
     </View>
@@ -86,7 +95,7 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   emoji: { fontSize: 56, marginBottom: 12 },
-  titulo: { fontSize: 24, fontWeight: '800', color: '#1a3c2e', textAlign: 'center' },
+  titulo: { fontSize: 22, fontWeight: '800', color: '#1a3c2e', textAlign: 'center' },
   subtitulo: { fontSize: 14, color: '#666', marginBottom: 32 },
   cards: { flexDirection: 'row', gap: 16, marginBottom: 28 },
   card: {
@@ -120,8 +129,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   botaoSecundarioTexto: { color: '#2d6a4f', fontWeight: '700', fontSize: 15 },
-  sair: {
-    paddingVertical: 8,
-  },
+  sair: { paddingVertical: 8 },
   sairTexto: { color: '#999', fontSize: 14 },
 });

@@ -19,6 +19,8 @@ public class AppDbContext : DbContext
             e.HasKey(p => p.Id);
             e.Property(p => p.Id).HasColumnName("id");
             e.Property(p => p.Nome).HasColumnName("nome").HasMaxLength(100).IsRequired();
+            e.Property(p => p.Cidade).HasColumnName("cidade").HasMaxLength(100);
+            e.Property(p => p.Estado).HasColumnName("estado").HasMaxLength(2);
         });
 
         modelBuilder.Entity<Usuario>(e =>
@@ -26,6 +28,8 @@ public class AppDbContext : DbContext
             e.ToTable("USUARIO");
             e.HasKey(u => u.Id);
             e.Property(u => u.Id).HasColumnName("id");
+            e.Property(u => u.Nome).HasColumnName("nome").HasMaxLength(100);
+            e.Property(u => u.Email).HasColumnName("email").HasMaxLength(150);
             e.Property(u => u.NomeUsuario).HasColumnName("usuario").HasMaxLength(50).IsRequired();
             e.Property(u => u.Senha).HasColumnName("senha").HasMaxLength(255).IsRequired();
             e.Property(u => u.PropriedadeId).HasColumnName("propriedade_id");

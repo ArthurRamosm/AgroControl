@@ -5,7 +5,15 @@ import {
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
-import { API_URL } from '../config/api';
+import { api, getMensagemErro } from '../config/api';
+import { setSession } from '../services/session';
+
+type LoginResponse = {
+  sucesso: boolean;
+  nome?: string;
+  propriedadeId?: number;
+  mensagem?: string;
+};
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Login'>;
@@ -24,24 +32,18 @@ export default function LoginScreen({ navigation }: Props) {
     }
     setCarregando(true);
     try {
-      const response = await fetch(`${API_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usuario: usuario.trim(), senha: senha.trim() }),
+      const resultado = await api.post<LoginResponse>('/api/auth/login', {
+        usuario: usuario.trim(),
+        senha: senha.trim(),
       });
 
-      const resultado = await response.json();
-
-      if (resultado.sucesso) {
-        navigation.replace('Home');
-      } else {
-        Alert.alert('Erro', resultado.mensagem ?? 'Usuário ou senha incorretos!');
-      }
-    } catch {
-      Alert.alert(
-        'Erro de conexão',
-        'Não foi possível conectar à API.\nVerifique se o dotnet run está rodando.'
-      );
+      setSession({
+        propriedadeId: resultado.propriedadeId!,
+        nome: resultado.nome ?? usuario.trim(),
+      });
+      navigation.replace('Home');
+    } catch (error) {
+      Alert.alert('Erro', getMensagemErro(error));
     } finally {
       setCarregando(false);
     }
@@ -82,6 +84,13 @@ export default function LoginScreen({ navigation }: Props) {
             ? <ActivityIndicator color="#fff" />
             : <Text style={styles.botaoTexto}>Entrar</Text>
           }
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.linkCadastro}
+          onPress={() => navigation.navigate('Register')}
+        >
+          <Text style={styles.linkCadastroTexto}>Não tem conta? Cadastre-se</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -127,4 +136,6 @@ const styles = StyleSheet.create({
   },
   botaoDesabilitado: { backgroundColor: '#7aab95' },
   botaoTexto: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  linkCadastro: { marginTop: 20, paddingVertical: 4 },
+  linkCadastroTexto: { color: '#2d6a4f', fontWeight: '600', fontSize: 14 },
 });

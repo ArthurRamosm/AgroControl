@@ -6,7 +6,8 @@ import {
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../types/navigation';
-import { API_URL } from '../config/api';
+import { api, getMensagemErro } from '../config/api';
+import { getSession } from '../services/session';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'CadastroAnimal'>;
@@ -30,6 +31,7 @@ function resolverChip(valor: string, opcoes: string[]): { chip: string; custom: 
 export default function CadastroAnimalScreen({ navigation, route }: Props) {
   const animalEdicao = route.params?.animal;
   const modoEdicao = !!animalEdicao;
+  const { propriedadeId } = getSession();
 
   const [brinco, setBrinco] = useState('');
   const [nome, setNome] = useState('');
@@ -81,32 +83,31 @@ export default function CadastroAnimalScreen({ navigation, route }: Props) {
 
     setSalvando(true);
     try {
-      const url = modoEdicao
-        ? `${API_URL}/api/animais/${animalEdicao!.id}`
-        : `${API_URL}/api/animais`;
+      const body = {
+        brinco: brinco.trim().toUpperCase(),
+        nome: nome.trim(),
+        raca: racaFinal,
+        sexo,
+        tipo: tipoFinal,
+        statusLeite: sexo === 'F' ? statusLeite : 'N/A',
+        propriedadeId,
+      };
 
-      const response = await fetch(url, {
-        method: modoEdicao ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          brinco: brinco.trim().toUpperCase(),
-          nome: nome.trim(),
-          raca: racaFinal,
-          sexo,
-          tipo: tipoFinal,
-          statusLeite: sexo === 'F' ? statusLeite : 'N/A',
-          propriedadeId: 1,
-        }),
-      });
-
-      if (response.ok) {
-        mostrarAviso('sucesso', modoEdicao ? 'Animal atualizado com sucesso!' : 'Animal cadastrado com sucesso!');
+      if (modoEdicao) {
+        await api.put(
+          `/api/animais/${animalEdicao!.id}?propriedadeId=${propriedadeId}`,
+          body
+        );
       } else {
-        const erro = await response.json();
-        mostrarAviso('erro', erro.mensagem ?? 'Não foi possível salvar.');
+        await api.post('/api/animais', body);
       }
-    } catch {
-      mostrarAviso('erro', 'Não foi possível conectar à API.\nVerifique se o dotnet run está rodando.');
+
+      mostrarAviso(
+        'sucesso',
+        modoEdicao ? 'Animal atualizado com sucesso!' : 'Animal cadastrado com sucesso!'
+      );
+    } catch (error) {
+      mostrarAviso('erro', getMensagemErro(error));
     } finally {
       setSalvando(false);
     }
@@ -127,7 +128,6 @@ export default function CadastroAnimalScreen({ navigation, route }: Props) {
         </View>
 
         <View style={styles.form}>
-
           {/* Brinco */}
           <Text style={styles.label}>Brinco <Text style={styles.obrigatorio}>*</Text></Text>
           <TextInput

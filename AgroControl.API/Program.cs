@@ -10,6 +10,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 // Serviços
 builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<AnimaisService>();
 
 // Controllers
 builder.Services.AddControllers();
