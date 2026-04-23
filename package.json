@@ -10,6 +10,7 @@
     "server": "json-server --watch db.json --port 3000 --host 0.0.0.0"
   },
   "dependencies": {
+    "@expo/vector-icons": "^15.0.2",
     "@react-navigation/native": "^7.2.1",
     "@react-navigation/native-stack": "^7.14.9",
     "expo": "55.0.10-canary-20260327-0789fbc",
