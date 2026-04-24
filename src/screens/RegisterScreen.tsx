@@ -1,15 +1,30 @@
 import React, { useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, Modal, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
+  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  ScrollView, Modal, FlatList, KeyboardAvoidingView, Platform,
+  ActivityIndicator, Image, Dimensions, StatusBar, Alert,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
 import { api, getMensagemErro } from '../config/api';
-import InputField from '../components/InputField';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const PRIMARY = '#1a3d1f';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Register'>;
+};
+
+type Erros = {
+  nomeCompleto?: string;
+  email?: string;
+  nomeProp?: string;
+  cidade?: string;
+  estado?: string;
+  usuario?: string;
+  senha?: string;
+  confirmarSenha?: string;
 };
 
 const ESTADOS = [
@@ -53,34 +68,39 @@ export default function RegisterScreen({ navigation }: Props) {
   const [confirmarSenha, setConfirmarSenha] = useState('');
   const [carregando, setCarregando] = useState(false);
   const [modalEstado, setModalEstado] = useState(false);
+  const [senhaVisivel, setSenhaVisivel] = useState(false);
+  const [confirmarSenhaVisivel, setConfirmarSenhaVisivel] = useState(false);
+  const [erros, setErros] = useState<Erros>({});
+  const [erroGeral, setErroGeral] = useState('');
 
   const estadoSelecionado = ESTADOS.find(e => e.sigla === estado);
 
-  function validar(): string | null {
-    if (!nomeCompleto.trim()) return 'Nome completo é obrigatório.';
-    if (!email.trim()) return 'E-mail é obrigatório.';
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return 'Informe um e-mail válido.';
-    if (!nomeProp.trim()) return 'Nome da propriedade é obrigatório.';
-    if (!cidade.trim()) return 'Cidade é obrigatória.';
-    if (!estado) return 'Selecione um estado.';
-    if (!usuario.trim()) return 'Usuário é obrigatório.';
-    if (!/^[a-zA-Z0-9_]+$/.test(usuario.trim()))
-      return 'Usuário não pode ter espaços ou caracteres especiais.';
-    if (!senha) return 'Senha é obrigatória.';
-    if (senha.length < 4) return 'Senha deve ter pelo menos 4 caracteres.';
-    if (senha !== confirmarSenha) return 'Senha e confirmação não coincidem.';
-    return null;
+  function limparErro(campo: keyof Erros) {
+    setErros(prev => ({ ...prev, [campo]: undefined }));
+  }
+
+  function validar(): boolean {
+    const novos: Erros = {};
+    if (!nomeCompleto.trim()) novos.nomeCompleto = 'Nome completo é obrigatório.';
+    if (!email.trim()) novos.email = 'E-mail é obrigatório.';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) novos.email = 'Informe um e-mail válido.';
+    if (!nomeProp.trim()) novos.nomeProp = 'Nome da propriedade é obrigatório.';
+    if (!cidade.trim()) novos.cidade = 'Cidade é obrigatória.';
+    if (!estado) novos.estado = 'Selecione um estado.';
+    if (!usuario.trim()) novos.usuario = 'Usuário é obrigatório.';
+    else if (!/^[a-zA-Z0-9_]+$/.test(usuario.trim())) novos.usuario = 'Sem espaços ou caracteres especiais.';
+    if (!senha) novos.senha = 'Senha é obrigatória.';
+    else if (senha.length < 4) novos.senha = 'Mínimo 4 caracteres.';
+    if (!confirmarSenha) novos.confirmarSenha = 'Confirme sua senha.';
+    else if (senha !== confirmarSenha) novos.confirmarSenha = 'Senhas não coincidem.';
+    setErros(novos);
+    return Object.keys(novos).length === 0;
   }
 
   async function handleCadastrar() {
     if (carregando) return;
-
-    const erro = validar();
-    if (erro) {
-      Alert.alert('Atenção', erro);
-      return;
-    }
-
+    setErroGeral('');
+    if (!validar()) return;
     setCarregando(true);
     try {
       await api.post('/api/auth/register', {
@@ -88,20 +108,15 @@ export default function RegisterScreen({ navigation }: Props) {
         email: email.trim().toLowerCase(),
         usuario: usuario.trim().toLowerCase(),
         senha,
-        propriedade: {
-          nome: nomeProp.trim(),
-          cidade: cidade.trim(),
-          estado,
-        },
+        propriedade: { nome: nomeProp.trim(), cidade: cidade.trim(), estado },
       });
-
       Alert.alert(
-        'Sucesso',
-        'Cadastro realizado com sucesso! Faça login para continuar.',
-        [{ text: 'OK', onPress: () => navigation.replace('Login') }]
+        'Cadastro realizado!',
+        'Sua conta foi criada com sucesso. Faça login para continuar.',
+        [{ text: 'OK', onPress: () => navigation.replace('Login') }],
       );
     } catch (error) {
-      Alert.alert('Erro', getMensagemErro(error));
+      setErroGeral(getMensagemErro(error));
     } finally {
       setCarregando(false);
     }
@@ -109,108 +124,207 @@ export default function RegisterScreen({ navigation }: Props) {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={{ flex: 1, backgroundColor: PRIMARY }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        <View style={styles.cabecalho}>
-          <Text style={styles.logo}>🐄</Text>
-          <Text style={styles.titulo}>Criar Conta</Text>
-          <Text style={styles.subtitulo}>AgroControl</Text>
+      <StatusBar barStyle="light-content" backgroundColor={PRIMARY} />
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ── Cabeçalho verde ── */}
+        <View style={styles.headerWrapper}>
+          <TouchableOpacity style={styles.btnVoltar} onPress={() => navigation.goBack()}>
+            <Ionicons name="chevron-back" size={26} color="#fff" />
+          </TouchableOpacity>
+
+          <View style={styles.header}>
+            <Image
+              source={require('../../assets/Logomenor.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+          </View>
+
         </View>
 
+        {/* ── Formulário ── */}
         <View style={styles.form}>
-          {/* Dados pessoais */}
-          <Text style={styles.secao}>Dados Pessoais</Text>
 
-          <InputField
-            label="Nome Completo"
-            required
-            placeholder="Ex: João da Silva"
-            value={nomeCompleto}
-            onChangeText={setNomeCompleto}
-          />
+          {/* ── Seção 1: Dados Pessoais ── */}
+          <View style={styles.secaoHeader}>
+            <Ionicons name="person" size={15} color={PRIMARY} />
+            <Text style={styles.secaoTitulo}>DADOS PESSOAIS</Text>
+          </View>
 
-          <InputField
-            label="E-mail"
-            required
-            placeholder="Ex: joao@email.com"
-            autoCapitalize="none"
-            keyboardType="email-address"
-            value={email}
-            onChangeText={setEmail}
-          />
+          <View style={styles.campoWrapper}>
+            <Text style={styles.label}>Nome Completo <Text style={styles.obrigatorio}>*</Text></Text>
+            <View style={[styles.inputBox, erros.nomeCompleto && styles.inputBoxErro]}>
+              <Ionicons name="person-outline" size={18} color={PRIMARY} style={styles.inputIcone} />
+              <TextInput
+                style={styles.input}
+                placeholder=""
+                placeholderTextColor="#bbb"
+                value={nomeCompleto}
+                onChangeText={t => { setNomeCompleto(t); limparErro('nomeCompleto'); }}
+              />
+            </View>
+            {erros.nomeCompleto ? <Text style={styles.erro}>{erros.nomeCompleto}</Text> : null}
+          </View>
 
-          {/* Dados da propriedade */}
-          <Text style={[styles.secao, { marginTop: 20 }]}>Dados da Propriedade</Text>
+          <View style={styles.campoWrapper}>
+            <Text style={styles.label}>E-mail <Text style={styles.obrigatorio}>*</Text></Text>
+            <View style={[styles.inputBox, erros.email && styles.inputBoxErro]}>
+              <Ionicons name="mail-outline" size={18} color={PRIMARY} style={styles.inputIcone} />
+              <TextInput
+                style={styles.input}
+                placeholder=""
+                placeholderTextColor="#bbb"
+                autoCapitalize="none"
+                keyboardType="email-address"
+                value={email}
+                onChangeText={t => { setEmail(t); limparErro('email'); }}
+              />
+            </View>
+            {erros.email ? <Text style={styles.erro}>{erros.email}</Text> : null}
+          </View>
 
-          <InputField
-            label="Nome da Propriedade"
-            required
-            placeholder="Ex: Fazenda Boa Vista"
-            value={nomeProp}
-            onChangeText={setNomeProp}
-          />
+          {/* ── Seção 2: Dados da Propriedade ── */}
+          <View style={[styles.secaoHeader, styles.secaoMargem]}>
+            <Ionicons name="home" size={15} color={PRIMARY} />
+            <Text style={styles.secaoTitulo}>DADOS DA PROPRIEDADE</Text>
+          </View>
 
-          <InputField
-            label="Cidade"
-            required
-            placeholder="Ex: Uberaba"
-            value={cidade}
-            onChangeText={setCidade}
-          />
+          <View style={styles.campoWrapper}>
+            <Text style={styles.label}>Nome da Propriedade <Text style={styles.obrigatorio}>*</Text></Text>
+            <View style={[styles.inputBox, erros.nomeProp && styles.inputBoxErro]}>
+              <Ionicons name="home-outline" size={18} color={PRIMARY} style={styles.inputIcone} />
+              <TextInput
+                style={styles.input}
+                placeholder=""
+                placeholderTextColor="#bbb"
+                value={nomeProp}
+                onChangeText={t => { setNomeProp(t); limparErro('nomeProp'); }}
+              />
+            </View>
+            {erros.nomeProp ? <Text style={styles.erro}>{erros.nomeProp}</Text> : null}
+          </View>
 
-          {/* Seletor de Estado */}
-          <View style={{ marginBottom: 4 }}>
-            <Text style={styles.label}>
-              Estado <Text style={styles.obrigatorio}>*</Text>
-            </Text>
+          <View style={styles.campoWrapper}>
+            <Text style={styles.label}>Cidade <Text style={styles.obrigatorio}>*</Text></Text>
+            <View style={[styles.inputBox, erros.cidade && styles.inputBoxErro]}>
+              <Ionicons name="location-outline" size={18} color={PRIMARY} style={styles.inputIcone} />
+              <TextInput
+                style={styles.input}
+                placeholder=""
+                placeholderTextColor="#bbb"
+                value={cidade}
+                onChangeText={t => { setCidade(t); limparErro('cidade'); }}
+              />
+            </View>
+            {erros.cidade ? <Text style={styles.erro}>{erros.cidade}</Text> : null}
+          </View>
+
+          <View style={styles.campoWrapper}>
+            <Text style={styles.label}>Estado <Text style={styles.obrigatorio}>*</Text></Text>
             <TouchableOpacity
-              style={styles.seletor}
+              style={[styles.inputBox, erros.estado && styles.inputBoxErro]}
               onPress={() => setModalEstado(true)}
+              activeOpacity={0.8}
             >
-              <Text style={estadoSelecionado ? styles.seletorTexto : styles.seletorPlaceholder}>
+              <Ionicons name="map-outline" size={18} color={PRIMARY} style={styles.inputIcone} />
+              <Text style={[styles.input, styles.inputTexto, !estado && { color: '#bbb' }]}>
                 {estadoSelecionado
                   ? `${estadoSelecionado.sigla} — ${estadoSelecionado.nome}`
                   : 'Selecione o estado...'}
               </Text>
-              <Text style={styles.seletorIcone}>▾</Text>
+              <Ionicons name="chevron-down" size={18} color="#888" />
             </TouchableOpacity>
+            {erros.estado ? <Text style={styles.erro}>{erros.estado}</Text> : null}
           </View>
 
-          {/* Credenciais */}
-          <Text style={[styles.secao, { marginTop: 20 }]}>Credenciais de Acesso</Text>
+          {/* ── Seção 3: Credenciais de Acesso ── */}
+          <View style={[styles.secaoHeader, styles.secaoMargem]}>
+            <Ionicons name="lock-closed" size={15} color={PRIMARY} />
+            <Text style={styles.secaoTitulo}>CREDENCIAIS DE ACESSO</Text>
+          </View>
 
-          <InputField
-            label="Usuário"
-            required
-            placeholder="Ex: joao123 (sem espaços)"
-            autoCapitalize="none"
-            value={usuario}
-            onChangeText={setUsuario}
-          />
+          <View style={styles.campoWrapper}>
+            <Text style={styles.label}>Usuário <Text style={styles.obrigatorio}>*</Text></Text>
+            <View style={[styles.inputBox, erros.usuario && styles.inputBoxErro]}>
+              <Ionicons name="person-outline" size={18} color={PRIMARY} style={styles.inputIcone} />
+              <TextInput
+                style={styles.input}
+                placeholder=""
+                placeholderTextColor="#bbb"
+                autoCapitalize="none"
+                value={usuario}
+                onChangeText={t => { setUsuario(t); limparErro('usuario'); }}
+              />
+            </View>
+            {erros.usuario ? <Text style={styles.erro}>{erros.usuario}</Text> : null}
+          </View>
 
-          <InputField
-            label="Senha"
-            required
-            placeholder="Mínimo 4 caracteres"
-            secureTextEntry
-            value={senha}
-            onChangeText={setSenha}
-          />
+          <View style={styles.campoWrapper}>
+            <Text style={styles.label}>Senha <Text style={styles.obrigatorio}>*</Text></Text>
+            <View style={[styles.inputBox, erros.senha && styles.inputBoxErro]}>
+              <Ionicons name="lock-closed-outline" size={18} color={PRIMARY} style={styles.inputIcone} />
+              <TextInput
+                style={styles.input}
+                placeholder=""
+                placeholderTextColor="#bbb"
+                secureTextEntry={!senhaVisivel}
+                value={senha}
+                onChangeText={t => { setSenha(t); limparErro('senha'); }}
+              />
+              <TouchableOpacity
+                onPress={() => setSenhaVisivel(v => !v)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons
+                  name={senhaVisivel ? 'eye-outline' : 'eye-off-outline'}
+                  size={18}
+                  color="#888"
+                />
+              </TouchableOpacity>
+            </View>
+            {erros.senha ? <Text style={styles.erro}>{erros.senha}</Text> : null}
+          </View>
 
-          <InputField
-            label="Confirmar Senha"
-            required
-            placeholder="Repita a senha"
-            secureTextEntry
-            value={confirmarSenha}
-            onChangeText={setConfirmarSenha}
-          />
+          <View style={styles.campoWrapper}>
+            <Text style={styles.label}>Confirmar Senha <Text style={styles.obrigatorio}>*</Text></Text>
+            <View style={[styles.inputBox, erros.confirmarSenha && styles.inputBoxErro]}>
+              <Ionicons name="lock-closed-outline" size={18} color={PRIMARY} style={styles.inputIcone} />
+              <TextInput
+                style={styles.input}
+                placeholder=""
+                placeholderTextColor="#bbb"
+                secureTextEntry={!confirmarSenhaVisivel}
+                value={confirmarSenha}
+                onChangeText={t => { setConfirmarSenha(t); limparErro('confirmarSenha'); }}
+              />
+              <TouchableOpacity
+                onPress={() => setConfirmarSenhaVisivel(v => !v)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons
+                  name={confirmarSenhaVisivel ? 'eye-outline' : 'eye-off-outline'}
+                  size={18}
+                  color="#888"
+                />
+              </TouchableOpacity>
+            </View>
+            {erros.confirmarSenha ? <Text style={styles.erro}>{erros.confirmarSenha}</Text> : null}
+          </View>
 
+          {erroGeral ? <Text style={styles.erroGeral}>{erroGeral}</Text> : null}
+
+          {/* ── Botão Cadastrar ── */}
           <TouchableOpacity
             style={[styles.botao, carregando && styles.botaoDesabilitado]}
             onPress={handleCadastrar}
+            activeOpacity={0.85}
           >
             {carregando
               ? <ActivityIndicator color="#fff" />
@@ -218,23 +332,20 @@ export default function RegisterScreen({ navigation }: Props) {
             }
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.linkLogin}
-            onPress={() => navigation.replace('Login')}
-          >
+          <TouchableOpacity style={styles.linkLogin} onPress={() => navigation.replace('Login')}>
             <Text style={styles.linkLoginTexto}>Já tenho conta — Fazer Login</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
 
-      {/* Modal seletor de estado */}
+      {/* ── Modal seletor de estado ── */}
       <Modal visible={modalEstado} transparent animationType="slide">
         <View style={styles.modalFundo}>
           <View style={styles.modalCaixa}>
             <View style={styles.modalCabecalho}>
               <Text style={styles.modalTitulo}>Selecione o Estado</Text>
               <TouchableOpacity onPress={() => setModalEstado(false)}>
-                <Text style={styles.modalFechar}>✕</Text>
+                <Ionicons name="close" size={22} color="#888" />
               </TouchableOpacity>
             </View>
             <FlatList
@@ -242,13 +353,11 @@ export default function RegisterScreen({ navigation }: Props) {
               keyExtractor={item => item.sigla}
               renderItem={({ item }) => (
                 <TouchableOpacity
-                  style={[
-                    styles.modalItem,
-                    item.sigla === estado && styles.modalItemSelecionado,
-                  ]}
+                  style={[styles.modalItem, item.sigla === estado && styles.modalItemSelecionado]}
                   onPress={() => {
                     setEstado(item.sigla);
                     setModalEstado(false);
+                    limparErro('estado');
                   }}
                 >
                   <Text style={styles.modalItemSigla}>{item.sigla}</Text>
@@ -270,59 +379,149 @@ export default function RegisterScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1a3c2e' },
-  content: { paddingBottom: 40 },
-  cabecalho: {
-    alignItems: 'center',
-    paddingTop: 56,
-    paddingBottom: 28,
-    paddingHorizontal: 24,
+  scroll: {
+    flexGrow: 1,
   },
-  logo: { fontSize: 44, marginBottom: 8 },
-  titulo: { fontSize: 26, fontWeight: '800', color: '#fff' },
-  subtitulo: { fontSize: 14, color: '#a8d5b5', marginTop: 2 },
+  // ── Header ──
+  headerWrapper: {
+    backgroundColor: PRIMARY,
+  },
+  btnVoltar: {
+    position: 'absolute',
+    top: 48,
+    left: 16,
+    zIndex: 10,
+    padding: 4,
+  },
+  header: {
+    minHeight: SCREEN_HEIGHT * 0.30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 52,
+    paddingBottom: 12,
+    paddingHorizontal: 28,
+  },
+  logo: {
+    width: 200,
+    height: 200,
+    marginBottom: 14,
+  },
+  appNome: {
+    color: '#ffffff',
+    fontSize: 30,
+    fontWeight: '800',
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  subtitulo: {
+    color: 'rgba(255,255,255,0.80)',
+    fontSize: 11,
+    letterSpacing: 2.5,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  // ── Formulário ──
   form: {
-    backgroundColor: '#f0f4f0',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
-    minHeight: 600,
+    flex: 1,
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
+    paddingHorizontal: 24,
+    paddingTop: 28,
+    paddingBottom: 52,
   },
-  secao: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#2d6a4f',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: 4,
-  },
-  label: { fontSize: 14, fontWeight: '600', color: '#333', marginBottom: 6, marginTop: 16 },
-  obrigatorio: { color: '#c0392b' },
-  seletor: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 10,
-    padding: 14,
+  // ── Seção ──
+  secaoHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 6,
+    marginBottom: 14,
   },
-  seletorTexto: { fontSize: 15, color: '#333' },
-  seletorPlaceholder: { fontSize: 15, color: '#bbb' },
-  seletorIcone: { fontSize: 16, color: '#888' },
-  botao: {
-    backgroundColor: '#2d6a4f',
+  secaoMargem: {
+    marginTop: 16,
+  },
+  secaoTitulo: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: PRIMARY,
+    letterSpacing: 1,
+  },
+  // ── Campo ──
+  campoWrapper: {
+    marginBottom: 14,
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#444',
+    marginBottom: 6,
+  },
+  obrigatorio: {
+    color: '#d32f2f',
+  },
+  inputBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
     borderRadius: 10,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 28,
+    paddingHorizontal: 12,
   },
-  botaoDesabilitado: { backgroundColor: '#7aab95' },
-  botaoTexto: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  linkLogin: { alignItems: 'center', paddingVertical: 16 },
-  linkLoginTexto: { color: '#2d6a4f', fontWeight: '600', fontSize: 14 },
-  // Modal
+  inputBoxErro: {
+    borderColor: '#d32f2f',
+  },
+  inputIcone: {
+    marginRight: 10,
+  },
+  input: {
+    flex: 1,
+    fontSize: 14,
+    color: '#333',
+    paddingVertical: 13,
+  },
+  inputTexto: {
+    paddingVertical: 13,
+  },
+  erro: {
+    color: '#d32f2f',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  erroGeral: {
+    color: '#d32f2f',
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  // ── Botão ──
+  botao: {
+    backgroundColor: PRIMARY,
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  botaoDesabilitado: {
+    backgroundColor: '#4a6b4d',
+  },
+  botaoTexto: {
+    color: '#ffffff',
+    fontWeight: '700',
+    fontSize: 16,
+    letterSpacing: 0.5,
+  },
+  linkLogin: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  linkLoginTexto: {
+    color: PRIMARY,
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  // ── Modal ──
   modalFundo: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -342,8 +541,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
-  modalTitulo: { fontSize: 17, fontWeight: '700', color: '#1a3c2e' },
-  modalFechar: { fontSize: 18, color: '#888', paddingHorizontal: 4 },
+  modalTitulo: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: PRIMARY,
+  },
   modalItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -351,14 +553,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     gap: 12,
   },
-  modalItemSelecionado: { backgroundColor: '#e8f5ee' },
+  modalItemSelecionado: {
+    backgroundColor: '#e8f5ee',
+  },
   modalItemSigla: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#2d6a4f',
+    color: PRIMARY,
     width: 32,
   },
-  modalItemNome: { fontSize: 15, color: '#333' },
-  modalItemNomeSelecionado: { color: '#1a3c2e', fontWeight: '600' },
-  separador: { height: 1, backgroundColor: '#f0f0f0', marginHorizontal: 20 },
+  modalItemNome: {
+    fontSize: 15,
+    color: '#333',
+  },
+  modalItemNomeSelecionado: {
+    color: PRIMARY,
+    fontWeight: '600',
+  },
+  separador: {
+    height: 1,
+    backgroundColor: '#f0f0f0',
+    marginHorizontal: 20,
+  },
 });

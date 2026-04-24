@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, Alert, KeyboardAvoidingView, Platform,
-  ActivityIndicator, Image, ScrollView,
+  StyleSheet, KeyboardAvoidingView, Platform,
+  ActivityIndicator, Image, ScrollView, Dimensions, StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
 import { api, getMensagemErro } from '../config/api';
 import { setSession } from '../services/session';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const PRIMARY = '#1a3d1f';
 
 type LoginResponse = {
   sucesso: boolean;
@@ -21,18 +24,18 @@ type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Login'>;
 };
 
-const PRIMARY = '#1a3d1f';
-
 export default function LoginScreen({ navigation }: Props) {
   const [usuario, setUsuario] = useState('');
   const [senha, setSenha] = useState('');
   const [carregando, setCarregando] = useState(false);
   const [senhaVisivel, setSenhaVisivel] = useState(false);
+  const [erro, setErro] = useState('');
 
   async function handleLogin() {
     if (carregando) return;
+    setErro('');
     if (!usuario.trim() || !senha.trim()) {
-      Alert.alert('Atenção', 'Preencha usuário e senha.');
+      setErro('Preencha usuário e senha.');
       return;
     }
     setCarregando(true);
@@ -41,14 +44,13 @@ export default function LoginScreen({ navigation }: Props) {
         usuario: usuario.trim(),
         senha: senha.trim(),
       });
-
       setSession({
         propriedadeId: resultado.propriedadeId!,
         nome: resultado.nome ?? usuario.trim(),
       });
       navigation.replace('Home');
     } catch (error) {
-      Alert.alert('Erro', getMensagemErro(error));
+      setErro(getMensagemErro(error));
     } finally {
       setCarregando(false);
     }
@@ -57,80 +59,104 @@ export default function LoginScreen({ navigation }: Props) {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      <StatusBar barStyle="light-content" backgroundColor={PRIMARY} />
       <ScrollView
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Logo */}
-        <View style={styles.logoArea}>
-          <Image
-            source={require('../../assets/logo.png')}
-            style={styles.logo}
-            resizeMode="contain"
-          />
+        {/* Cabeçalho verde + onda SVG */}
+        <View style={styles.headerWrapper}>
+          <View style={styles.header}>
+            <Image
+              source={require('../../assets/Logoimagem.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+            <Text style={styles.appNome}>AgroControl</Text>
+            <Text style={styles.subtitulo}>— TECNOLOGIA QUE FAZ O CAMPO EVOLUIR —</Text>
+          </View>
+
         </View>
 
-        {/* Formulário */}
+        {/* Seção branca */}
         <View style={styles.form}>
           {/* Campo Usuário */}
-          <View style={styles.inputWrapper}>
-            <Ionicons name="person-outline" size={20} color="#999" style={styles.inputIcon} />
+          <View style={styles.inputLinha}>
+            <Ionicons name="person-outline" size={20} color={PRIMARY} style={styles.inputIcone} />
             <TextInput
               style={styles.input}
               placeholder="Usuário"
               placeholderTextColor="#bbb"
               autoCapitalize="none"
               value={usuario}
-              onChangeText={setUsuario}
+              onChangeText={t => { setUsuario(t); setErro(''); }}
             />
+            {usuario.length > 0 && (
+              <Ionicons name="checkmark" size={22} color={PRIMARY} />
+            )}
           </View>
 
           {/* Campo Senha */}
-          <View style={styles.inputWrapper}>
-            <Ionicons name="lock-closed-outline" size={20} color="#999" style={styles.inputIcon} />
+          <View style={styles.inputLinha}>
+            <Ionicons name="lock-closed-outline" size={20} color={PRIMARY} style={styles.inputIcone} />
             <TextInput
-              style={[styles.input, styles.inputSenha]}
+              style={styles.input}
               placeholder="Senha"
               placeholderTextColor="#bbb"
               secureTextEntry={!senhaVisivel}
               value={senha}
-              onChangeText={setSenha}
+              onChangeText={t => { setSenha(t); setErro(''); }}
             />
             <TouchableOpacity
               onPress={() => setSenhaVisivel(v => !v)}
-              style={styles.olhoBtn}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <Ionicons
                 name={senhaVisivel ? 'eye-outline' : 'eye-off-outline'}
                 size={20}
-                color="#999"
+                color="#888"
               />
             </TouchableOpacity>
           </View>
 
+          {/* Mensagem de erro */}
+          {erro ? <Text style={styles.erro}>{erro}</Text> : null}
+
+          {/* Esqueceu a senha */}
+          <TouchableOpacity style={styles.esqueceuBtn}>
+            <Text style={styles.esqueceuTexto}>Esqueceu a senha?</Text>
+          </TouchableOpacity>
+
           {/* Botão Entrar */}
           <TouchableOpacity
-            style={[styles.botao, carregando && styles.botaoDesabilitado]}
+            style={[styles.botaoEntrar, carregando && styles.botaoDesabilitado]}
             onPress={handleLogin}
             activeOpacity={0.85}
           >
             {carregando
               ? <ActivityIndicator color="#fff" />
-              : <Text style={styles.botaoTexto}>Entrar</Text>
+              : <Text style={styles.botaoEntrarTexto}>Entrar</Text>
             }
           </TouchableOpacity>
 
-          {/* Link Cadastro */}
-          <View style={styles.cadastroRow}>
-            <Text style={styles.cadastroLabel}>Não tem conta? </Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-              <Text style={styles.cadastroLink}>Cadastre-se</Text>
-            </TouchableOpacity>
+          {/* Divisor ou */}
+          <View style={styles.divisor}>
+            <View style={styles.divisorLinha} />
+            <Text style={styles.divisorTexto}>ou</Text>
+            <View style={styles.divisorLinha} />
           </View>
+
+          {/* Botão Criar conta */}
+          <TouchableOpacity
+            style={styles.botaoCadastro}
+            onPress={() => navigation.navigate('Register')}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.botaoCadastroTexto}>Criar conta</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -140,80 +166,125 @@ export default function LoginScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f0',
+    backgroundColor: PRIMARY,
   },
   scroll: {
     flexGrow: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-    paddingBottom: 48,
   },
-  logoArea: {
-    marginHorizontal: -24,
-    marginBottom: 36,
-    marginTop: -48,
+  headerWrapper: {
+    backgroundColor: PRIMARY,
+  },
+  header: {
+    minHeight: SCREEN_HEIGHT * 0.42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 52,
+    paddingBottom: 12,
+    paddingHorizontal: 28,
   },
   logo: {
-    width: '100%',
-    height: 340,
+    width: 180,
+    height: 180,
+    marginBottom: 14,
+  },
+  appNome: {
+    color: '#ffffff',
+    fontSize: 34,
+    fontWeight: '800',
+    letterSpacing: 1,
+    marginBottom: 10,
+  },
+  subtitulo: {
+    color: 'rgba(255,255,255,0.80)',
+    fontSize: 11,
+    letterSpacing: 2.5,
+    fontWeight: '500',
+    textAlign: 'center',
   },
   form: {
-    width: '100%',
+    flex: 1,
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
+    paddingHorizontal: 28,
+    paddingTop: 32,
+    paddingBottom: 52,
   },
-  inputWrapper: {
+  inputLinha: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 12,
-    marginBottom: 16,
-    paddingHorizontal: 14,
+    borderBottomWidth: 1.5,
+    borderBottomColor: '#e0e0e0',
+    marginBottom: 28,
+    paddingBottom: 10,
   },
-  inputIcon: {
-    marginRight: 10,
+  inputIcone: {
+    marginRight: 12,
   },
   input: {
     flex: 1,
-    paddingVertical: 14,
     fontSize: 15,
     color: '#333',
+    paddingVertical: 2,
   },
-  inputSenha: {
-    paddingRight: 4,
+  erro: {
+    color: '#d32f2f',
+    fontSize: 13,
+    marginTop: -18,
+    marginBottom: 16,
   },
-  olhoBtn: {
-    paddingLeft: 8,
-  },
-  botao: {
-    backgroundColor: PRIMARY,
-    paddingVertical: 16,
-    borderRadius: 14,
-    alignItems: 'center',
-    marginTop: 8,
+  esqueceuBtn: {
+    alignSelf: 'flex-end',
     marginBottom: 28,
   },
-  botaoDesabilitado: {
-    backgroundColor: '#6a9070',
+  esqueceuTexto: {
+    color: PRIMARY,
+    fontSize: 13,
+    fontWeight: '500',
   },
-  botaoTexto: {
-    color: '#fff',
+  botaoEntrar: {
+    backgroundColor: PRIMARY,
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  botaoDesabilitado: {
+    backgroundColor: '#5a7a5f',
+  },
+  botaoEntrarTexto: {
+    color: '#ffffff',
     fontWeight: '700',
     fontSize: 16,
     letterSpacing: 0.5,
   },
-  cadastroRow: {
+  divisor: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  divisorLinha: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#e0e0e0',
+  },
+  divisorTexto: {
+    marginHorizontal: 14,
+    color: '#aaa',
+    fontSize: 14,
+  },
+  botaoCadastro: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1.5,
+    borderColor: PRIMARY,
+    paddingVertical: 16,
+    borderRadius: 12,
     alignItems: 'center',
   },
-  cadastroLabel: {
-    color: '#888',
-    fontSize: 14,
-  },
-  cadastroLink: {
+  botaoCadastroTexto: {
     color: PRIMARY,
     fontWeight: '700',
-    fontSize: 14,
+    fontSize: 16,
+    letterSpacing: 0.5,
   },
 });
