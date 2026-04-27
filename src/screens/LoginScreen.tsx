@@ -67,7 +67,6 @@ export default function LoginScreen({ navigation }: Props) {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Cabeçalho verde + onda SVG */}
         <View style={styles.headerWrapper}>
           <View style={styles.header}>
             <Image
@@ -81,9 +80,8 @@ export default function LoginScreen({ navigation }: Props) {
 
         </View>
 
-        {/* Seção branca */}
+
         <View style={styles.form}>
-          {/* Campo Usuário */}
           <View style={styles.inputLinha}>
             <Ionicons name="person-outline" size={20} color={PRIMARY} style={styles.inputIcone} />
             <TextInput
@@ -99,7 +97,6 @@ export default function LoginScreen({ navigation }: Props) {
             )}
           </View>
 
-          {/* Campo Senha */}
           <View style={styles.inputLinha}>
             <Ionicons name="lock-closed-outline" size={20} color={PRIMARY} style={styles.inputIcone} />
             <TextInput
@@ -122,15 +119,13 @@ export default function LoginScreen({ navigation }: Props) {
             </TouchableOpacity>
           </View>
 
-          {/* Mensagem de erro */}
+ 
           {erro ? <Text style={styles.erro}>{erro}</Text> : null}
 
-          {/* Esqueceu a senha */}
           <TouchableOpacity style={styles.esqueceuBtn}>
             <Text style={styles.esqueceuTexto}>Esqueceu a senha?</Text>
           </TouchableOpacity>
 
-          {/* Botão Entrar */}
           <TouchableOpacity
             style={[styles.botaoEntrar, carregando && styles.botaoDesabilitado]}
             onPress={handleLogin}
@@ -142,14 +137,12 @@ export default function LoginScreen({ navigation }: Props) {
             }
           </TouchableOpacity>
 
-          {/* Divisor ou */}
           <View style={styles.divisor}>
             <View style={styles.divisorLinha} />
             <Text style={styles.divisorTexto}>ou</Text>
             <View style={styles.divisorLinha} />
           </View>
 
-          {/* Botão Criar conta */}
           <TouchableOpacity
             style={styles.botaoCadastro}
             onPress={() => navigation.navigate('Register')}

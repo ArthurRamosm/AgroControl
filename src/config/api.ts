@@ -1,4 +1,4 @@
-export const API_URL = 'http://localhost:5249';
+export const API_URL = 'https://beige-deer-sit.loca.lt';
 
 type ApiOptions = {
   signal?: AbortSignal;
