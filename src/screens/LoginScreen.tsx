@@ -2,21 +2,27 @@ import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform,
-  ActivityIndicator, Image, ScrollView, Dimensions, StatusBar,
+  ActivityIndicator, Image, ScrollView, Dimensions,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
 import { api, getMensagemErro } from '../config/api';
-import { setSession } from '../services/session';
+import { saveSession, savePasswordForOffline } from '../services/session';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PRIMARY = '#1a3d1f';
 
 type LoginResponse = {
   sucesso: boolean;
+  id?: number;
   nome?: string;
+  usuario?: string;
+  email?: string;
   propriedadeId?: number;
+  propriedade?: { nome: string; cidade: string; estado: string; focoProdutivo?: string };
   mensagem?: string;
 };
 
@@ -44,10 +50,15 @@ export default function LoginScreen({ navigation }: Props) {
         usuario: usuario.trim(),
         senha: senha.trim(),
       });
-      setSession({
-        propriedadeId: resultado.propriedadeId!,
+      await saveSession({
+        id: resultado.id ?? 0,
         nome: resultado.nome ?? usuario.trim(),
+        usuario: resultado.usuario ?? usuario.trim(),
+        email: resultado.email ?? '',
+        propriedadeId: resultado.propriedadeId!,
+        propriedade: resultado.propriedade ?? { nome: '', cidade: '', estado: '' },
       });
+      await savePasswordForOffline(senha.trim());
       navigation.replace('Home');
     } catch (error) {
       setErro(getMensagemErro(error));
@@ -57,11 +68,12 @@ export default function LoginScreen({ navigation }: Props) {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <StatusBar barStyle="light-content" backgroundColor={PRIMARY} />
+    <SafeAreaView style={{ flex: 1, backgroundColor: PRIMARY }}>
+      <StatusBar style="light" />
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
       <ScrollView
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
@@ -152,7 +164,8 @@ export default function LoginScreen({ navigation }: Props) {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 

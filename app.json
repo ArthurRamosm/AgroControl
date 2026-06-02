@@ -2,30 +2,58 @@
   "expo": {
     "name": "AgroControl",
     "slug": "AgroControl",
+    "scheme": "agrocontrol",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/Logomenor.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/Logoimagem.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#0d2b10"
     },
     "ios": {
       "supportsTablet": true
     },
     "android": {
+      "icon": "./assets/Logomenor.png",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "foregroundImage": "./assets/Logomenor.png",
+        "backgroundColor": "#0d2b10"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.AgroControl"
+      "package": "com.anonymous.AgroControl",
+      "jsEngine": "hermes",
+      "newArchEnabled": false,
+      "softwareKeyboardLayoutMode": "pan"
+    },
+    "androidStatusBar": {
+      "backgroundColor": "#0d2b10",
+      "barStyle": "light-content"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "83970759-6841-4542-9c58-984935996505"
+      }
+    },
+    "plugins": [
+      "expo-image-picker",
+      "expo-sqlite",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35,
+            "minSdkVersion": 24,
+            "enableProguardInReleaseBuilds": false,
+            "enableShrinkResourcesInReleaseBuilds": false
+          }
+        }
+      ]
+    ]
   }
 }

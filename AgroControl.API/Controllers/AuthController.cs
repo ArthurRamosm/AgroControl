@@ -35,7 +35,6 @@ public class AuthController(AuthService authService, AppDbContext db, ILogger<Au
         return Ok(resultado);
     }
 
-    // POST /api/auth/register
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterRequestDto request)
     {
@@ -104,5 +103,45 @@ public class AuthController(AuthService authService, AppDbContext db, ILogger<Au
             Sucesso = true,
             Mensagem = "Cadastro realizado com sucesso!"
         });
+    }
+
+    // PUT /api/auth/perfil
+    [HttpPut("perfil")]
+    public async Task<IActionResult> AtualizarPerfil([FromBody] AtualizarPerfilDto request)
+    {
+        var usuario = await _db.Usuarios.FindAsync(request.UsuarioId);
+        if (usuario is null)
+            return NotFound(new { sucesso = false, mensagem = "Usuário não encontrado." });
+
+        if (!string.IsNullOrWhiteSpace(request.Nome))
+            usuario.Nome = request.Nome.Trim();
+
+        if (!string.IsNullOrWhiteSpace(request.Email))
+        {
+            var emailEmUso = await _db.Usuarios
+                .AnyAsync(u => u.Email == request.Email.ToLower() && u.Id != request.UsuarioId);
+            if (emailEmUso)
+                return Conflict(new { sucesso = false, mensagem = "Este e-mail já está em uso." });
+            usuario.Email = request.Email.Trim().ToLower();
+        }
+
+        await _db.SaveChangesAsync();
+        return Ok(new { sucesso = true, mensagem = "Perfil atualizado com sucesso." });
+    }
+
+    // PUT /api/auth/alterar-senha
+    [HttpPut("alterar-senha")]
+    public async Task<IActionResult> AlterarSenha([FromBody] AlterarSenhaDto request)
+    {
+        var usuario = await _db.Usuarios.FindAsync(request.UsuarioId);
+        if (usuario is null)
+            return NotFound(new { sucesso = false, mensagem = "Usuário não encontrado." });
+
+        if (usuario.Senha != request.SenhaAtual)
+            return BadRequest(new { sucesso = false, mensagem = "Senha atual incorreta." });
+
+        usuario.Senha = request.NovaSenha;
+        await _db.SaveChangesAsync();
+        return Ok(new { sucesso = true, mensagem = "Senha alterada com sucesso." });
     }
 }

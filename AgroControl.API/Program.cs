@@ -11,23 +11,34 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // Serviços
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<AnimaisService>();
+builder.Services.AddScoped<DashboardService>();
+builder.Services.AddScoped<AlertaService>();
+builder.Services.AddScoped<FinanceiroService>();
+builder.Services.AddScoped<AfastamentoService>();
+builder.Services.AddScoped<RelatorioService>();
+builder.Services.AddScoped<AnimalFichaService>();
+builder.Services.AddScoped<SaudeService>();
+builder.Services.AddScoped<EstoqueService>();
+builder.Services.AddScoped<PropriedadeAreaService>();
+builder.Services.AddScoped<PropriedadePontoService>();
 
 // Controllers
 builder.Services.AddControllers();
 
-// CORS — permite o app React Native acessar a API
 builder.Services.AddCors(options =>
 {
-    options.AddDefaultPolicy(policy =>
+    options.AddPolicy("AllowAll", policy =>
+    {
         policy.AllowAnyOrigin()
-              .AllowAnyHeader()
-              .AllowAnyMethod());
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
 });
 
 var app = builder.Build();
 
-app.UseCors();
-app.UseHttpsRedirection();
+app.UseCors("AllowAll");
+app.UseAuthorization();
 app.MapControllers();
 
 app.Run();

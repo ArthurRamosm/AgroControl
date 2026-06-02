@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, Modal, FlatList, KeyboardAvoidingView, Platform,
-  ActivityIndicator, Image, Dimensions, StatusBar, Alert,
+  ActivityIndicator, Image, Dimensions,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
@@ -72,6 +74,14 @@ export default function RegisterScreen({ navigation }: Props) {
   const [confirmarSenhaVisivel, setConfirmarSenhaVisivel] = useState(false);
   const [erros, setErros] = useState<Erros>({});
   const [erroGeral, setErroGeral] = useState('');
+  const [sucesso, setSucesso] = useState(false);
+  const [nomeRegistrado, setNomeRegistrado] = useState('');
+
+  useEffect(() => {
+    if (!sucesso) return;
+    const timer = setTimeout(() => navigation.replace('Login'), 4000);
+    return () => clearTimeout(timer);
+  }, [sucesso]);
 
   const estadoSelecionado = ESTADOS.find(e => e.sigla === estado);
 
@@ -110,11 +120,8 @@ export default function RegisterScreen({ navigation }: Props) {
         senha,
         propriedade: { nome: nomeProp.trim(), cidade: cidade.trim(), estado },
       });
-      Alert.alert(
-        'Cadastro realizado!',
-        'Sua conta foi criada com sucesso. Faça login para continuar.',
-        [{ text: 'OK', onPress: () => navigation.replace('Login') }],
-      );
+      setNomeRegistrado(nomeCompleto.trim());
+      setSucesso(true);
     } catch (error) {
       setErroGeral(getMensagemErro(error));
     } finally {
@@ -122,18 +129,41 @@ export default function RegisterScreen({ navigation }: Props) {
     }
   }
 
+  if (sucesso) {
+    return (
+      <SafeAreaView style={styles.sucessoContainer}>
+        <StatusBar style="light" />
+        <View style={styles.sucessoIconeWrapper}>
+          <Ionicons name="checkmark-circle" size={90} color="#4caf50" />
+        </View>
+        <Text style={styles.sucessoTitulo}>Cadastro realizado!</Text>
+        <Text style={styles.sucessoNome}>Bem-vindo, {nomeRegistrado}!</Text>
+        <Text style={styles.sucessoDescricao}>
+          Sua conta foi criada com sucesso.{'\n'}Redirecionando para o login...
+        </Text>
+        <TouchableOpacity
+          style={styles.sucessoBotao}
+          onPress={() => navigation.replace('Login')}
+        >
+          <Text style={styles.sucessoBotaoTexto}>Fazer Login agora</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: PRIMARY }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <StatusBar barStyle="light-content" backgroundColor={PRIMARY} />
+    <SafeAreaView style={{ flex: 1, backgroundColor: PRIMARY }}>
+      <StatusBar style="light" />
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
       <ScrollView
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Cabeçalho verde ── */}
+
         <View style={styles.headerWrapper}>
           <TouchableOpacity style={styles.btnVoltar} onPress={() => navigation.goBack()}>
             <Ionicons name="chevron-back" size={26} color="#fff" />
@@ -149,10 +179,8 @@ export default function RegisterScreen({ navigation }: Props) {
 
         </View>
 
-        {/* ── Formulário ── */}
         <View style={styles.form}>
 
-          {/* ── Seção 1: Dados Pessoais ── */}
           <View style={styles.secaoHeader}>
             <Ionicons name="person" size={15} color={PRIMARY} />
             <Text style={styles.secaoTitulo}>DADOS PESSOAIS</Text>
@@ -190,7 +218,6 @@ export default function RegisterScreen({ navigation }: Props) {
             {erros.email ? <Text style={styles.erro}>{erros.email}</Text> : null}
           </View>
 
-          {/* ── Seção 2: Dados da Propriedade ── */}
           <View style={[styles.secaoHeader, styles.secaoMargem]}>
             <Ionicons name="home" size={15} color={PRIMARY} />
             <Text style={styles.secaoTitulo}>DADOS DA PROPRIEDADE</Text>
@@ -244,7 +271,6 @@ export default function RegisterScreen({ navigation }: Props) {
             {erros.estado ? <Text style={styles.erro}>{erros.estado}</Text> : null}
           </View>
 
-          {/* ── Seção 3: Credenciais de Acesso ── */}
           <View style={[styles.secaoHeader, styles.secaoMargem]}>
             <Ionicons name="lock-closed" size={15} color={PRIMARY} />
             <Text style={styles.secaoTitulo}>CREDENCIAIS DE ACESSO</Text>
@@ -320,7 +346,6 @@ export default function RegisterScreen({ navigation }: Props) {
 
           {erroGeral ? <Text style={styles.erroGeral}>{erroGeral}</Text> : null}
 
-          {/* ── Botão Cadastrar ── */}
           <TouchableOpacity
             style={[styles.botao, carregando && styles.botaoDesabilitado]}
             onPress={handleCadastrar}
@@ -338,7 +363,6 @@ export default function RegisterScreen({ navigation }: Props) {
         </View>
       </ScrollView>
 
-      {/* ── Modal seletor de estado ── */}
       <Modal visible={modalEstado} transparent animationType="slide">
         <View style={styles.modalFundo}>
           <View style={styles.modalCaixa}>
@@ -374,7 +398,8 @@ export default function RegisterScreen({ navigation }: Props) {
           </View>
         </View>
       </Modal>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
@@ -382,7 +407,7 @@ const styles = StyleSheet.create({
   scroll: {
     flexGrow: 1,
   },
-  // ── Header ──
+
   headerWrapper: {
     backgroundColor: PRIMARY,
   },
@@ -430,7 +455,7 @@ const styles = StyleSheet.create({
     paddingTop: 28,
     paddingBottom: 52,
   },
-  // ── Seção ──
+
   secaoHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -446,7 +471,7 @@ const styles = StyleSheet.create({
     color: PRIMARY,
     letterSpacing: 1,
   },
-  // ── Campo ──
+
   campoWrapper: {
     marginBottom: 14,
   },
@@ -574,5 +599,54 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#f0f0f0',
     marginHorizontal: 20,
+  },
+
+  // ── Tela de sucesso ──
+  sucessoContainer: {
+    flex: 1,
+    backgroundColor: PRIMARY,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+  },
+  sucessoIconeWrapper: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(76, 175, 80, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 28,
+  },
+  sucessoTitulo: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#ffffff',
+    marginBottom: 8,
+  },
+  sucessoNome: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#4caf50',
+    marginBottom: 16,
+  },
+  sucessoDescricao: {
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.75)',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 40,
+  },
+  sucessoBotao: {
+    backgroundColor: '#4caf50',
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 48,
+    alignItems: 'center',
+  },
+  sucessoBotaoTexto: {
+    color: '#ffffff',
+    fontWeight: '700',
+    fontSize: 16,
   },
 });

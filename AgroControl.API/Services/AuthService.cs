@@ -32,8 +32,18 @@ public class AuthService
         return new LoginResponseDto
         {
             Sucesso = true,
+            Id = usuario.Id,
             Nome = string.IsNullOrWhiteSpace(usuario.Nome) ? usuario.NomeUsuario : usuario.Nome,
-            PropriedadeId = usuario.PropriedadeId
+            Usuario = usuario.NomeUsuario,
+            Email = usuario.Email,
+            PropriedadeId = usuario.PropriedadeId,
+            Propriedade = usuario.Propriedade is null ? null : new PropriedadeLoginDto
+            {
+                Nome = usuario.Propriedade.Nome,
+                Cidade = usuario.Propriedade.Cidade ?? string.Empty,
+                Estado = usuario.Propriedade.Estado ?? string.Empty,
+                FocoProdutivo = usuario.Propriedade.FocoProdutivo,
+            },
         };
     }
 }

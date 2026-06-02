@@ -1,4 +1,7 @@
-export const API_URL = 'https://beige-deer-sit.loca.lt';
+const DEV_URL = 'http://192.168.1.2:5249';
+const PROD_URL = 'https://unenvied-snowfall-undrafted.ngrok-free.dev';
+
+export const API_URL = __DEV__ ? DEV_URL : PROD_URL;
 
 type ApiOptions = {
   signal?: AbortSignal;
@@ -12,9 +15,16 @@ export class ApiError extends Error {
 }
 
 async function request<T>(method: string, path: string, body?: unknown, options?: ApiOptions): Promise<T> {
+  const headers: Record<string, string> = {
+    'bypass-tunnel-reminder': 'true',
+  };
+  if (body !== undefined) {
+    headers['Content-Type'] = 'application/json';
+  }
+
   const response = await fetch(`${API_URL}${path}`, {
     method,
-    headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+    headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
     signal: options?.signal,
   });

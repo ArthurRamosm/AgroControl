@@ -11,16 +11,41 @@ public class AnimaisController(AnimaisService service, ILogger<AnimaisController
     private readonly AnimaisService _service = service;
     private readonly ILogger<AnimaisController> _logger = logger;
 
-    // GET /api/animais?propriedadeId=1
+    // GET /api/animais?propriedadeId=1&busca=Mimosa&ativo=true&vendido=false&doente=true
     [HttpGet]
-    public async Task<IActionResult> Listar([FromQuery] int propriedadeId)
+    public async Task<IActionResult> Listar(
+        [FromQuery] int propriedadeId,
+        [FromQuery] string? busca = null,
+        [FromQuery] bool? ativo = null,
+        [FromQuery] bool? vendido = null,
+        [FromQuery] bool? doente = null)
     {
         if (propriedadeId <= 0)
             return BadRequest(new { sucesso = false, mensagem = "ID da propriedade é obrigatório." });
 
-        _logger.LogInformation("Listando animais da propriedade {PropriedadeId}", propriedadeId);
-        var animais = await _service.ListarAsync(propriedadeId);
+        _logger.LogInformation("Listando animais da propriedade {PropriedadeId} busca={Busca}", propriedadeId, busca);
+        var animais = await _service.ListarAsync(propriedadeId, busca, ativo, vendido, doente);
         return Ok(animais);
+    }
+
+    // GET /api/animais/buscar-filiacao?propriedadeId=1&termo=BR-001
+    [HttpGet("buscar-filiacao")]
+    public async Task<IActionResult> BuscarFiliacao(
+        [FromQuery] int propriedadeId,
+        [FromQuery] string termo,
+        [FromQuery] int? ignorarAnimalId)
+    {
+        if (propriedadeId <= 0)
+            return BadRequest(new { sucesso = false, mensagem = "ID da propriedade Ã© obrigatÃ³rio." });
+
+        if (string.IsNullOrWhiteSpace(termo))
+            return BadRequest(new { sucesso = false, mensagem = "Informe o nÃºmero ou brinco do animal." });
+
+        var animal = await _service.BuscarFiliacaoAsync(propriedadeId, termo, ignorarAnimalId);
+        if (animal is null)
+            return NotFound(new { sucesso = false, mensagem = "Animal nÃ£o encontrado, preencha manualmente." });
+
+        return Ok(animal);
     }
 
     // POST /api/animais
@@ -38,7 +63,6 @@ public class AnimaisController(AnimaisService service, ILogger<AnimaisController
         return Ok(new { sucesso = true, mensagem, id });
     }
 
-    // PUT /api/animais/{id}?propriedadeId=1
     [HttpPut("{id}")]
     public async Task<IActionResult> Atualizar(int id, [FromQuery] int propriedadeId, [FromBody] CadastrarAnimalDto dto)
     {
@@ -55,8 +79,7 @@ public class AnimaisController(AnimaisService service, ILogger<AnimaisController
 
         return Ok(new { sucesso = true, mensagem });
     }
-
-    // DELETE /api/animais/{id}?propriedadeId=1
+    
     [HttpDelete("{id}")]
     public async Task<IActionResult> Excluir(int id, [FromQuery] int propriedadeId)
     {

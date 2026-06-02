@@ -3,10 +3,38 @@ export type AnimalParams = {
   brinco: string;
   nome?: string | null;
   raca: string;
+  raca2?: string | null;
   sexo: 'M' | 'F';
   tipo: string;
   statusLeite: string;
   ativo: boolean;
+  numeroAnimal?: string | null;
+  dataNascimento?: string | null;
+  dataNascimentoInformada?: string | null;
+  paiAnimalId?: number | null;
+  nomePai?: string | null;
+  racaPai?: string | null;
+  maeAnimalId?: number | null;
+  nomeMae?: string | null;
+  racaMae?: string | null;
+  procedencia?: string | null;
+  dataEntrada?: string | null;
+  dataEntradaInformada?: string | null;
+  dataSaida?: string | null;
+  dataSaidaInformada?: string | null;
+  valor?: number | null;
+  motivoSaida?: string | null;
+  marcaSinal?: string | null;
+  observacao?: string | null;
+  fotos?: AnimalFotoParams[];
+};
+
+export type AnimalFotoParams = {
+  id: number;
+  animalId: number;
+  fotoBase64: string;
+  ordem: number;
+  createdAt: string;
 };
 
 export type RootStackParamList = {
@@ -14,5 +42,14 @@ export type RootStackParamList = {
   Register: undefined;
   Home: undefined;
   AnimalList: undefined;
+  Saude: undefined;
+  Estoque: undefined;
+  MapaPropriedade: undefined;
+  AnimalDetails: { animal: AnimalParams };
+  AnimalReport: { animal: AnimalParams };
   CadastroAnimal: { animal?: AnimalParams } | undefined;
+  Financeiro: undefined;
+  Relatorios: undefined;
+  Afastamento: undefined;
+  Configuracoes: undefined;
 };

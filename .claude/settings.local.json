@@ -3,7 +3,8 @@
     "allow": [
       "Bash(npx expo *)",
       "Bash(npm uninstall *)",
-      "Bash(npx ngrok *)"
+      "Bash(npx ngrok *)",
+      "Bash(dotnet build *)"
     ]
   }
 }
