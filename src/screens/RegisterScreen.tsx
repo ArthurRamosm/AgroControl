@@ -171,7 +171,7 @@ export default function RegisterScreen({ navigation }: Props) {
 
           <View style={styles.header}>
             <Image
-              source={require('../../assets/Logomenor.png')}
+              source={require('../../assets/LogoApp.png')}
               style={styles.logo}
               resizeMode="contain"
             />

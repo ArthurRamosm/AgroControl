@@ -4,7 +4,9 @@
       "Bash(npx expo *)",
       "Bash(npm uninstall *)",
       "Bash(npx ngrok *)",
-      "Bash(dotnet build *)"
+      "Bash(dotnet build *)",
+      "PowerShell(& \".specify/scripts/powershell/check-prerequisites.ps1\" -Json -RequireTasks -IncludeTasks)",
+      "PowerShell(& \".specify/extensions/git/scripts/powershell/auto-commit.ps1\" \"after_implement\")"
     ]
   }
 }

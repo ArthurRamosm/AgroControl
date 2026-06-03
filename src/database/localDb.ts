@@ -108,6 +108,14 @@ export async function initDatabase(): Promise<void> {
         PRIMARY KEY(propriedade_id, tipo)
       );
 
+      CREATE TABLE IF NOT EXISTS mapa_cache (
+        propriedade_id INTEGER NOT NULL,
+        tipo TEXT NOT NULL,
+        dados_json TEXT NOT NULL,
+        atualizado_em TEXT NOT NULL,
+        PRIMARY KEY(propriedade_id, tipo)
+      );
+
       CREATE TABLE IF NOT EXISTS animal_ficha_cache (
         animal_id INTEGER PRIMARY KEY,
         dados_json TEXT NOT NULL,
@@ -380,6 +388,33 @@ export async function getRelatorioCache<T>(propriedadeId: number, tipo: string):
     return row ? (JSON.parse(row.dados_json) as { dados: T; periodoLabel: string }) : null;
   } catch {
     return null;
+  }
+}
+
+// ── Mapa cache ────────────────────────────────────────────────────────────────
+
+export async function saveMapaCache(propriedadeId: number, tipo: 'areas' | 'pontos', dados: object[]): Promise<void> {
+  if (!db) return;
+  try {
+    await db.runAsync(
+      'INSERT OR REPLACE INTO mapa_cache (propriedade_id, tipo, dados_json, atualizado_em) VALUES (?, ?, ?, ?)',
+      [propriedadeId, tipo, JSON.stringify(dados), new Date().toISOString()],
+    );
+  } catch (error) {
+    console.error('saveMapaCache error:', error);
+  }
+}
+
+export async function getMapaCache<T>(propriedadeId: number, tipo: 'areas' | 'pontos'): Promise<T[]> {
+  if (!db) return [];
+  try {
+    const row = await db.getFirstAsync<{ dados_json: string }>(
+      'SELECT dados_json FROM mapa_cache WHERE propriedade_id = ? AND tipo = ?',
+      [propriedadeId, tipo],
+    );
+    return row ? (JSON.parse(row.dados_json) as T[]) : [];
+  } catch {
+    return [];
   }
 }
 

@@ -39,10 +39,10 @@ type Props = {
 type FiltroSexo = 'Todos' | 'F' | 'M';
 type FiltroLeite = 'Todos' | 'Produzindo' | 'Seca';
 type FaixaEtaria = 'Menos de 1 ano' | '1 a 3 anos' | '4 anos ou mais';
-type ChipRapido = 'Todos' | 'Machos' | 'Fêmeas' | 'Ativos' | 'Vendidos' | 'Doentes';
+type ChipRapido = 'Todos' | 'Machos' | 'Fêmeas' | 'Produzindo' | 'Bezerros' | 'Afastado';
 
 const FAIXAS: FaixaEtaria[] = ['Menos de 1 ano', '1 a 3 anos', '4 anos ou mais'];
-const CHIPS_RAPIDOS: ChipRapido[] = ['Todos', 'Machos', 'Fêmeas', 'Ativos', 'Vendidos', 'Doentes'];
+const CHIPS_RAPIDOS: ChipRapido[] = ['Todos', 'Machos', 'Fêmeas', 'Produzindo', 'Bezerros', 'Afastado'];
 
 type AfastamentoResumo = { animalId: number; ativo: boolean; dataRetorno: string | null };
 
@@ -209,12 +209,12 @@ export default function AnimalListScreen({ navigation }: Props) {
       // Chip rápido
       if (chipRapido === 'Machos' && a.sexo !== 'M') return false;
       if (chipRapido === 'Fêmeas' && a.sexo !== 'F') return false;
-      if (chipRapido === 'Ativos' && !a.ativo) return false;
-      if (chipRapido === 'Vendidos') {
-        if (a.ativo) return false;
-        if (!(a.motivoSaida ?? '').toLowerCase().includes('venda')) return false;
+      if (chipRapido === 'Produzindo' && (a.statusLeite ?? '').toLowerCase() !== 'produzindo') return false;
+      if (chipRapido === 'Bezerros') {
+        const m = idadeMeses(a);
+        if (m === null || m >= 12) return false;
       }
-      if (chipRapido === 'Doentes' && !afastamentosIds.has(a.id)) return false;
+      if (chipRapido === 'Afastado' && !afastamentosIds.has(a.id)) return false;
       // Busca por texto
       if (q && !(a.nome ?? '').toLowerCase().includes(q) && !a.brinco.toLowerCase().includes(q)) return false;
       // Filtros avançados

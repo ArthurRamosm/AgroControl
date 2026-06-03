@@ -63,9 +63,17 @@ public class DashboardService(AppDbContext db)
         var femeas = await _db.Animais
             .CountAsync(a => a.PropriedadeId == propriedadeId && a.Ativo && a.Sexo == "F");
 
-        var bezerros = await _db.Animais
+        var bezzerrosMachos = await _db.Animais
             .CountAsync(a => a.PropriedadeId == propriedadeId
                           && a.Ativo
+                          && a.Sexo == "M"
+                          && a.DataNascimento != null
+                          && a.DataNascimento > umAnoAtras);
+
+        var bezzerrosFemeas = await _db.Animais
+            .CountAsync(a => a.PropriedadeId == propriedadeId
+                          && a.Ativo
+                          && a.Sexo == "F"
                           && a.DataNascimento != null
                           && a.DataNascimento > umAnoAtras);
 
@@ -93,7 +101,8 @@ public class DashboardService(AppDbContext db)
             {
                 Machos = machos,
                 Femeas = femeas,
-                Bezerros = bezerros,
+                BezzerrosMachos = bezzerrosMachos,
+                BezzerrosFemeas = bezzerrosFemeas,
                 Matrizes = matrizes,
                 Reprodutores = reprodutores,
             },

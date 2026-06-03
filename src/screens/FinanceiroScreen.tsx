@@ -579,7 +579,7 @@ export default function FinanceiroScreen({ navigation }: Props) {
       valor: parseFloat(despesaForm.valor.replace(',', '.')),
       dataDespesa: dataBrParaIso(despesaForm.dataDespesa),
     };
-    await postComOffline('/api/financeiro/despesa', dados, 'despesas', () => {
+    await postComOffline(`/api/financeiro/${propriedadeId}/despesas`, dados, 'financeiro_despesas', () => {
       setModalDespesa(false);
       setDespesaForm({ categoria: 'Racao', descricao: '', valor: '', dataDespesa: hojeBr() });
     });
@@ -601,7 +601,7 @@ export default function FinanceiroScreen({ navigation }: Props) {
       valor: parseFloat(receitaForm.valor.replace(',', '.')),
       dataReceita: dataBrParaIso(receitaForm.dataReceita),
     };
-    await postComOffline('/api/financeiro/receita', dados, 'receitas', () => {
+    await postComOffline(`/api/financeiro/${propriedadeId}/receitas`, dados, 'financeiro_receitas', () => {
       setModalReceita(false);
       setReceitaForm({ tipo: 'Outros', descricao: '', valor: '', dataReceita: hojeBr() });
     });
@@ -628,7 +628,7 @@ export default function FinanceiroScreen({ navigation }: Props) {
       valor: parseFloat(vendaAnimalForm.valor.replace(',', '.')),
       dataReceita: dataBrParaIso(vendaAnimalForm.data),
     };
-    await postComOffline('/api/financeiro/receita', dados, 'receitas', () => {
+    await postComOffline(`/api/financeiro/${propriedadeId}/receitas`, dados, 'financeiro_receitas', () => {
       setModalVendaAnimal(false);
       setVendaAnimalForm({ valor: '', data: hojeBr(), observacao: '' });
       setAnimalSelecionado(null);
@@ -653,7 +653,7 @@ export default function FinanceiroScreen({ navigation }: Props) {
       valor: parseFloat(compraAnimalForm.valor.replace(',', '.')),
       dataDespesa: dataBrParaIso(compraAnimalForm.data),
     };
-    await postComOffline('/api/financeiro/despesa', dados, 'despesas', () => {
+    await postComOffline(`/api/financeiro/${propriedadeId}/despesas`, dados, 'financeiro_despesas', () => {
       setModalCompraAnimal(false);
       setCompraAnimalForm({ nomeAnimal: '', valor: '', data: hojeBr() });
     });
@@ -677,7 +677,7 @@ export default function FinanceiroScreen({ navigation }: Props) {
       valor: parseFloat(insumosForm.valor.replace(',', '.')),
       dataDespesa: dataBrParaIso(insumosForm.data),
     };
-    await postComOffline('/api/financeiro/despesa', dados, 'despesas', () => {
+    await postComOffline(`/api/financeiro/${propriedadeId}/despesas`, dados, 'financeiro_despesas', () => {
       setModalInsumos(false);
       setInsumosForm({ produto: '', categoria: 'Racao', quantidade: '', valor: '', data: hojeBr() });
     });
@@ -702,7 +702,7 @@ export default function FinanceiroScreen({ navigation }: Props) {
       valor: parseFloat(funcionarioForm.valor.replace(',', '.')),
       dataDespesa: dataBrParaIso(funcionarioForm.data),
     };
-    await postComOffline('/api/financeiro/despesa', dados, 'despesas', () => {
+    await postComOffline(`/api/financeiro/${propriedadeId}/despesas`, dados, 'financeiro_despesas', () => {
       setModalFuncionario(false);
       setFuncionarioForm({ nomeFuncionario: '', tipo: 'Salario', valor: '', data: hojeBr() });
     });

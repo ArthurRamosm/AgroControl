@@ -4,7 +4,8 @@ public class ResumoRebanhoDto
 {
     public int Machos { get; set; }
     public int Femeas { get; set; }
-    public int Bezerros { get; set; }
+    public int BezzerrosMachos { get; set; }
+    public int BezzerrosFemeas { get; set; }
     public int Matrizes { get; set; }
     public int Reprodutores { get; set; }
 }

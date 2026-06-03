@@ -484,7 +484,9 @@ export default function AnimalDetailsScreen({ navigation, route }: Props) {
     if (!isOnline) {
       await addToSyncQueue('vacinas', 'INSERT', { propriedadeId, ...dadosVacina });
       const reg: SaudeRegistro = { id: -Date.now(), animalId: animal.id, tipoRegistro: 'Vacina', dataRegistro: dadosVacina.dataAplicacao, descricao: dadosVacina.nomeVacina, dose: dadosVacina.dose, observacao: dadosVacina.observacao };
-      setSaudeRegistros(prev => [reg, ...prev]);
+      const novosSaudeRegistros = [reg, ...saudeRegistros];
+      setSaudeRegistros(novosSaudeRegistros);
+      saveAnimalFichaCache(animal.id, { eventos, lactacoes, reproducoes, saudeRegistros: novosSaudeRegistros }).catch(() => {});
       setVacinaModal(false);
       setVacinaForm(vacinaInicial);
       setSalvando(false);
@@ -499,7 +501,9 @@ export default function AnimalDetailsScreen({ navigation, route }: Props) {
     } catch (error) {
       await addToSyncQueue('vacinas', 'INSERT', { propriedadeId, ...dadosVacina });
       const reg: SaudeRegistro = { id: -Date.now(), animalId: animal.id, tipoRegistro: 'Vacina', dataRegistro: dadosVacina.dataAplicacao, descricao: dadosVacina.nomeVacina, dose: dadosVacina.dose, observacao: dadosVacina.observacao };
-      setSaudeRegistros(prev => [reg, ...prev]);
+      const novosSaudeRegistros = [reg, ...saudeRegistros];
+      setSaudeRegistros(novosSaudeRegistros);
+      saveAnimalFichaCache(animal.id, { eventos, lactacoes, reproducoes, saudeRegistros: novosSaudeRegistros }).catch(() => {});
       setVacinaModal(false);
       setVacinaForm(vacinaInicial);
       Alert.alert('Sem conexão', 'Vacina salva localmente e será sincronizada automaticamente.');

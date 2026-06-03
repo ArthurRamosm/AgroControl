@@ -35,7 +35,8 @@ const noTranslateProps =
 type ResumoRebanho = {
   machos: number;
   femeas: number;
-  bezerros: number;
+  bezzerrosMachos: number;
+  bezzerrosFemeas: number;
   matrizes: number;
   reprodutores: number;
 };
@@ -51,12 +52,13 @@ type DashboardStats = {
   resumoRebanho: ResumoRebanho;
 };
 
-const RESUMO_VAZIO: ResumoRebanho = { machos: 0, femeas: 0, bezerros: 0, matrizes: 0, reprodutores: 0 };
+const RESUMO_VAZIO: ResumoRebanho = { machos: 0, femeas: 0, bezzerrosMachos: 0, bezzerrosFemeas: 0, matrizes: 0, reprodutores: 0 };
 
 const ITENS_RESUMO = [
   { key: 'femeas' as keyof ResumoRebanho, label: 'Fêmeas', cor: '#E91E8C' },
   { key: 'machos' as keyof ResumoRebanho, label: 'Machos', cor: '#1565C0' },
-  { key: 'bezerros' as keyof ResumoRebanho, label: 'Bezerros', cor: '#F9A825' },
+  { key: 'bezzerrosMachos' as keyof ResumoRebanho, label: 'Bez. Machos', cor: '#1976D2' },
+  { key: 'bezzerrosFemeas' as keyof ResumoRebanho, label: 'Bez. Fêmeas', cor: '#F06292' },
   { key: 'matrizes' as keyof ResumoRebanho, label: 'Matrizes', cor: '#2E7D32' },
   { key: 'reprodutores' as keyof ResumoRebanho, label: 'Reprod.', cor: '#6A1B9A' },
 ];

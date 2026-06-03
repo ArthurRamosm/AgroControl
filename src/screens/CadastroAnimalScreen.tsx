@@ -53,7 +53,8 @@ const RACAS = [
   'Angus', 'Brahman', 'Desconhecida', 'Gir', 'Girolando', 'Guzerá',
   'Hereford', 'Holandesa', 'Jersey', 'Nelore', 'Senepol', 'Simmental', 'Outra',
 ];
-const TIPOS = ['Vaca', 'Touro', 'Novilha', 'Novilho', 'Bezerro', 'Bezerra', 'Reprodutor', 'Outra'];
+const TIPOS_FEMEA = ['Vaca', 'Novilha', 'Bezerra', 'Outra'];
+const TIPOS_MACHO = ['Touro', 'Novilho', 'Bezerro', 'Reprodutor', 'Outro'];
 const VACINAS_OPCOES = ['Brucelose', 'Febre Aftosa', 'Raiva', 'Outra'];
 
 function resolverChip(valor: string, opcoes: string[]): { chip: string; custom: string } {
@@ -144,7 +145,7 @@ export default function CadastroAnimalScreen({ navigation, route }: Props) {
   const [racaCustom2, setRacaCustom2] = useState('');
   const [tipoChip, setTipoChip] = useState('');
   const [tipoCustom, setTipoCustom] = useState('');
-  const [sexo, setSexo] = useState<'M' | 'F'>('F');
+  const [sexo, setSexo] = useState<'M' | 'F' | ''>('');
   const [statusLeite, setStatusLeite] = useState('Produzindo');
   const [dataNascimento, setDataNascimento] = useState('');
   const [paiBusca, setPaiBusca] = useState('');
@@ -216,7 +217,8 @@ export default function CadastroAnimalScreen({ navigation, route }: Props) {
         setRacaCustom2(r2.custom);
         setMostrarRaca2(true);
       }
-      const t = resolverChip(animalEdicao.tipo, TIPOS);
+      const tiposEdicao = animalEdicao.sexo === 'F' ? TIPOS_FEMEA : TIPOS_MACHO;
+      const t = resolverChip(animalEdicao.tipo, tiposEdicao);
       setTipoChip(t.chip);
       setTipoCustom(t.custom);
     }
@@ -384,9 +386,10 @@ export default function CadastroAnimalScreen({ navigation, route }: Props) {
     return v.nomeChip === 'Outra' ? v.nomeCustom || 'Outra' : v.nomeChip;
   }
 
+  const tiposDisponiveis = sexo === 'F' ? TIPOS_FEMEA : sexo === 'M' ? TIPOS_MACHO : [];
   const racaFinal = racaChip === 'Outra' ? racaCustom.trim() : racaChip;
   const raca2Final = racaChip2 === 'Outra' ? racaCustom2.trim() : racaChip2;
-  const tipoFinal = tipoChip === 'Outra' ? tipoCustom.trim() : tipoChip;
+  const tipoFinal = (tipoChip === 'Outra' || tipoChip === 'Outro') ? tipoCustom.trim() : tipoChip;
 
   const idadeMeses = idadeMesesDaData(dataNascimento);
   const exibirStatusLeite = sexo === 'F' && (idadeMeses === null || idadeMeses >= 24);
@@ -401,7 +404,7 @@ export default function CadastroAnimalScreen({ navigation, route }: Props) {
       mostrarAviso('atencao', 'Digite a raça no campo de texto.');
       return;
     }
-    if (tipoChip === 'Outra' && !tipoCustom.trim()) {
+    if ((tipoChip === 'Outra' || tipoChip === 'Outro') && !tipoCustom.trim()) {
       mostrarAviso('atencao', 'Digite o tipo no campo de texto.');
       return;
     }
@@ -604,7 +607,7 @@ export default function CadastroAnimalScreen({ navigation, route }: Props) {
                 <TouchableOpacity
                   key={s}
                   style={[styles.opcao, sexo === s && styles.opcaoSelecionada]}
-                  onPress={() => setSexo(s)}
+                  onPress={() => { setSexo(s); setTipoChip(''); setTipoCustom(''); }}
                 >
                   <Text style={[styles.opcaoTexto, sexo === s && styles.opcaoTextoSelecionado]}>
                     {s === 'F' ? 'Fêmea' : 'Macho'}
@@ -614,8 +617,12 @@ export default function CadastroAnimalScreen({ navigation, route }: Props) {
             </View>
 
             <Text style={styles.label}>Tipo <Text style={styles.obrigatorio}>*</Text></Text>
-            <ChipGroup options={TIPOS} value={tipoChip} onChange={(op) => { setTipoChip(op); setTipoCustom(''); }} />
-            {tipoChip === 'Outra' && (
+            {sexo === '' ? (
+              <Text style={{ color: '#888', fontSize: 13, marginBottom: 8 }}>Selecione o sexo antes de escolher o tipo</Text>
+            ) : (
+              <ChipGroup options={tiposDisponiveis} value={tipoChip} onChange={(op) => { setTipoChip(op); setTipoCustom(''); }} />
+            )}
+            {(tipoChip === 'Outra' || tipoChip === 'Outro') && (
               <Field value={tipoCustom} onChangeText={setTipoCustom} placeholder="Digite o tipo..." compact />
             )}
 

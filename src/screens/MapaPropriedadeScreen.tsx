@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -18,6 +17,8 @@ import { RootStackParamList } from '../types/navigation';
 import { ApiError, api, getMensagemErro } from '../config/api';
 import { getSession } from '../services/session';
 import BottomMenu from '../components/BottomMenu';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
+import { saveMapaCache, getMapaCache, addToSyncQueue } from '../database/localDb';
 
 let CircleMarker: any = null;
 let MapContainer: any = null;
@@ -123,49 +124,6 @@ const pontoFormInicial: PontoForm = {
   observacao: '',
 };
 
-function areasStorageKey(propriedadeId: number) {
-  return `agrocontrol:propriedade-areas:${propriedadeId}`;
-}
-
-function pontosStorageKey(propriedadeId: number) {
-  return `agrocontrol:propriedade-pontos:${propriedadeId}`;
-}
-
-async function carregarPontosLocais(propriedadeId: number): Promise<PropriedadePonto[]> {
-  try {
-    const valor = await AsyncStorage.getItem(pontosStorageKey(propriedadeId));
-    return valor ? JSON.parse(valor) as PropriedadePonto[] : [];
-  } catch {
-    return [];
-  }
-}
-
-async function gravarPontosLocais(propriedadeId: number, pontos: PropriedadePonto[]) {
-  await AsyncStorage.setItem(pontosStorageKey(propriedadeId), JSON.stringify(pontos));
-}
-
-async function carregarAreasLocais(propriedadeId: number): Promise<PropriedadeArea[]> {
-  try {
-    const valor = await AsyncStorage.getItem(areasStorageKey(propriedadeId));
-    return valor ? JSON.parse(valor) as PropriedadeArea[] : [];
-  } catch {
-    return [];
-  }
-}
-
-async function gravarAreasLocais(propriedadeId: number, areas: PropriedadeArea[]) {
-  await AsyncStorage.setItem(areasStorageKey(propriedadeId), JSON.stringify(areas));
-}
-
-async function salvarAreaLocal(propriedadeId: number, area: PropriedadeArea) {
-  const atuais = await carregarAreasLocais(propriedadeId);
-  const semAreaTotalDuplicada = area.tipoCadastro === 'AREA_TOTAL'
-    ? atuais.filter(item => item.tipoCadastro !== 'AREA_TOTAL')
-    : atuais;
-  const atualizadas = [...semAreaTotalDuplicada, area];
-  await gravarAreasLocais(propriedadeId, atualizadas);
-  return atualizadas;
-}
 
 function deveUsarAreasLocais(error: unknown) {
   return !(error instanceof ApiError) || error.status === 404;
@@ -181,6 +139,7 @@ function respostaCriacaoParaArea(area: PropriedadeArea, idRemoto?: number | null
 export default function MapaPropriedadeScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { propriedadeId } = getSession();
+  const { isOnline } = useNetworkStatus();
   const [pontos, setPontos] = useState<Coordenada[]>([]);
   const [areaFechada, setAreaFechada] = useState(false);
   const [areas, setAreas] = useState<PropriedadeArea[]>([]);
@@ -213,19 +172,26 @@ export default function MapaPropriedadeScreen({ navigation }: Props) {
 
   async function carregarAreas() {
     setCarregando(true);
+    if (!isOnline) {
+      const cached = await getMapaCache<PropriedadeArea>(propriedadeId, 'areas');
+      setAreas(cached);
+      setApiAreasDisponivel(false);
+      if (cached.some(area => area.tipoCadastro === 'AREA_TOTAL')) setFocoAreaSalvaSignal(v => v + 1);
+      setCarregando(false);
+      return;
+    }
     try {
       const dados = await api.get<PropriedadeArea[]>(`/api/propriedade-areas?propriedadeId=${propriedadeId}`);
       setAreas(dados);
       setApiAreasDisponivel(true);
       setFocoAreaSalvaSignal(valor => valor + 1);
+      saveMapaCache(propriedadeId, 'areas', dados).catch(() => {});
     } catch (error) {
       if (deveUsarAreasLocais(error)) {
         setApiAreasDisponivel(false);
-        const areasLocais = await carregarAreasLocais(propriedadeId);
-        setAreas(areasLocais);
-        if (areasLocais.some(area => area.tipoCadastro === 'AREA_TOTAL')) {
-          setFocoAreaSalvaSignal(valor => valor + 1);
-        }
+        const cached = await getMapaCache<PropriedadeArea>(propriedadeId, 'areas');
+        setAreas(cached);
+        if (cached.some(area => area.tipoCadastro === 'AREA_TOTAL')) setFocoAreaSalvaSignal(v => v + 1);
       } else {
         Alert.alert('Erro', getMensagemErro(error));
       }
@@ -235,13 +201,18 @@ export default function MapaPropriedadeScreen({ navigation }: Props) {
   }
 
   async function carregarPontos() {
+    if (!isOnline) {
+      const cached = await getMapaCache<PropriedadePonto>(propriedadeId, 'pontos');
+      if (cached.length > 0) setPontosMapa(cached);
+      return;
+    }
     try {
       const dados = await api.get<PropriedadePonto[]>(`/api/propriedade-pontos?propriedadeId=${propriedadeId}`);
       setPontosMapa(dados);
-      await gravarPontosLocais(propriedadeId, dados);
+      saveMapaCache(propriedadeId, 'pontos', dados).catch(() => {});
     } catch {
-      const pontosLocais = await carregarPontosLocais(propriedadeId);
-      if (pontosLocais.length > 0) setPontosMapa(pontosLocais);
+      const cached = await getMapaCache<PropriedadePonto>(propriedadeId, 'pontos');
+      if (cached.length > 0) setPontosMapa(cached);
     }
   }
 
@@ -373,6 +344,37 @@ export default function MapaPropriedadeScreen({ navigation }: Props) {
 
     setSalvando(true);
     try {
+      if (!isOnline) {
+        await addToSyncQueue('propriedade_areas', 'INSERT', {
+          propriedadeId: areaParaSalvar.propriedadeId,
+          tipoCadastro: areaParaSalvar.tipoCadastro,
+          areaPaiId: areaParaSalvar.areaPaiId,
+          nome: areaParaSalvar.nome,
+          tipoArea: areaParaSalvar.tipoArea,
+          cor: areaParaSalvar.cor,
+          observacao: areaParaSalvar.observacao,
+          coordenadasGeojson: areaParaSalvar.coordenadasGeojson,
+          areaHectares: areaParaSalvar.areaHectares,
+        });
+        const novasAreas = areaParaSalvar.tipoCadastro === 'AREA_TOTAL'
+          ? [...areas.filter(a => a.tipoCadastro !== 'AREA_TOTAL'), areaParaSalvar]
+          : [...areas, areaParaSalvar];
+        setAreas(novasAreas);
+        saveMapaCache(propriedadeId, 'areas', novasAreas).catch(() => {});
+        setModalVisivel(false);
+        if (modoCadastro === 'AREA_TOTAL') {
+          limpar();
+          setCadastroAreaTotalAtivo(false);
+          Alert.alert('Área salva', 'Área salva localmente e será sincronizada ao conectar.', [
+            { text: 'OK', onPress: () => navigation.navigate('Home') },
+          ]);
+          return;
+        }
+        limpar();
+        Alert.alert('Salvo', 'Área salva localmente e será sincronizada ao conectar.');
+        return;
+      }
+
       if (pareceForaDaAreaTotal) {
         Alert.alert('Atencao', 'Esta area interna parece ter pontos fora da Area Total. Vou salvar mesmo assim por enquanto.');
       }
@@ -388,9 +390,15 @@ export default function MapaPropriedadeScreen({ navigation }: Props) {
           coordenadasGeojson: areaParaSalvar.coordenadasGeojson,
           areaHectares: areaParaSalvar.areaHectares,
         });
-        setAreas(prev => [...prev.filter(area => area.tipoCadastro !== 'AREA_TOTAL' || areaParaSalvar.tipoCadastro !== 'AREA_TOTAL'), respostaCriacaoParaArea(areaParaSalvar, resposta.id)]);
+        const novasAreas = [...areas.filter(a => a.tipoCadastro !== 'AREA_TOTAL' || areaParaSalvar.tipoCadastro !== 'AREA_TOTAL'), respostaCriacaoParaArea(areaParaSalvar, resposta.id)];
+        setAreas(novasAreas);
+        saveMapaCache(propriedadeId, 'areas', novasAreas).catch(() => {});
       } else {
-        setAreas(await salvarAreaLocal(propriedadeId, areaParaSalvar));
+        const novasAreas = areaParaSalvar.tipoCadastro === 'AREA_TOTAL'
+          ? [...areas.filter(a => a.tipoCadastro !== 'AREA_TOTAL'), areaParaSalvar]
+          : [...areas, areaParaSalvar];
+        setAreas(novasAreas);
+        saveMapaCache(propriedadeId, 'areas', novasAreas).catch(() => {});
       }
       setModalVisivel(false);
       if (modoCadastro === 'AREA_TOTAL') {
@@ -406,7 +414,11 @@ export default function MapaPropriedadeScreen({ navigation }: Props) {
     } catch (error) {
       if (deveUsarAreasLocais(error)) {
         setApiAreasDisponivel(false);
-        setAreas(await salvarAreaLocal(propriedadeId, areaParaSalvar));
+        const novasAreas = areaParaSalvar.tipoCadastro === 'AREA_TOTAL'
+          ? [...areas.filter(a => a.tipoCadastro !== 'AREA_TOTAL'), areaParaSalvar]
+          : [...areas, areaParaSalvar];
+        setAreas(novasAreas);
+        saveMapaCache(propriedadeId, 'areas', novasAreas).catch(() => {});
         setModalVisivel(false);
         if (modoCadastro === 'AREA_TOTAL') {
           limpar();
@@ -469,11 +481,24 @@ export default function MapaPropriedadeScreen({ navigation }: Props) {
 
     setSalvandoPonto(true);
     try {
+      if (!isOnline) {
+        await addToSyncQueue('propriedade_pontos', 'INSERT', dadosPonto);
+        const novoPonto: PropriedadePonto = { ...dadosPonto, id: -Date.now(), createdAt: new Date().toISOString() } as unknown as PropriedadePonto;
+        const atualizados = [...pontosMapa, novoPonto];
+        setPontosMapa(atualizados);
+        saveMapaCache(propriedadeId, 'pontos', atualizados).catch(() => {});
+        setPontoModalVisivel(false);
+        setPontoPendente(null);
+        setPontoForm(pontoFormInicial);
+        Alert.alert('Salvo', 'Ponto salvo localmente e será sincronizado ao conectar.');
+        return;
+      }
+
       const criado = await api.post<PropriedadePonto>('/api/propriedade-pontos', dadosPonto);
       const novoPonto = criado ?? { ...dadosPonto, id: -Date.now(), createdAt: new Date().toISOString() } as unknown as PropriedadePonto;
       const atualizados = [...pontosMapa, novoPonto];
       setPontosMapa(atualizados);
-      await gravarPontosLocais(propriedadeId, atualizados);
+      saveMapaCache(propriedadeId, 'pontos', atualizados).catch(() => {});
       setPontoModalVisivel(false);
       setPontoPendente(null);
       setPontoForm(pontoFormInicial);
@@ -481,7 +506,7 @@ export default function MapaPropriedadeScreen({ navigation }: Props) {
       const novoPonto: PropriedadePonto = { ...dadosPonto, id: -Date.now(), createdAt: new Date().toISOString() } as unknown as PropriedadePonto;
       const atualizados = [...pontosMapa, novoPonto];
       setPontosMapa(atualizados);
-      await gravarPontosLocais(propriedadeId, atualizados);
+      saveMapaCache(propriedadeId, 'pontos', atualizados).catch(() => {});
       setPontoModalVisivel(false);
       setPontoPendente(null);
       setPontoForm(pontoFormInicial);

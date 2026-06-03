@@ -82,7 +82,7 @@ export default function LoginScreen({ navigation }: Props) {
         <View style={styles.headerWrapper}>
           <View style={styles.header}>
             <Image
-              source={require('../../assets/Logoimagem.png')}
+              source={require('../../assets/LogoApp.png')}
               style={styles.logo}
               resizeMode="contain"
             />
