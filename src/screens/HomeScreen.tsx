@@ -124,10 +124,14 @@ export default function HomeScreen({ navigation }: Props) {
 
   useEffect(() => {
     async function carregarDashboard() {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 5000);
       try {
         const stats = await api.get<DashboardStats>(
-          `/api/dashboard/${session.propriedadeId}`
+          `/api/dashboard/${session.propriedadeId}`,
+          { signal: ctrl.signal }
         );
+        clearTimeout(timer);
         const normalized: DashboardStats = {
           totalAnimais: stats.totalAnimais ?? 0,
           saudaveis: stats.saudaveis ?? 0,
@@ -141,20 +145,30 @@ export default function HomeScreen({ navigation }: Props) {
         setDashboardStats(normalized);
         saveDashboardCache(session.propriedadeId, normalized).catch(() => {});
       } catch {
-        const cached = await getDashboardCache<DashboardStats>(session.propriedadeId);
-        if (cached) setDashboardStats(cached);
+        clearTimeout(timer);
+        try {
+          const cached = await getDashboardCache<DashboardStats>(session.propriedadeId);
+          if (cached) setDashboardStats(cached);
+        } catch { /* sem cache disponível */ }
       }
 
       setAlertasCarregando(true);
+      const ctrl2 = new AbortController();
+      const timer2 = setTimeout(() => ctrl2.abort(), 5000);
       try {
         const lista = await api.get<AlertaItem[]>(
-          `/api/alertas/${session.propriedadeId}`
+          `/api/alertas/${session.propriedadeId}`,
+          { signal: ctrl2.signal }
         );
+        clearTimeout(timer2);
         setAlertas(lista.slice(0, 3));
         saveAlertasCache(session.propriedadeId, lista).catch(() => {});
       } catch {
-        const cached = await getAlertasCache<AlertaItem>(session.propriedadeId);
-        setAlertas(cached.slice(0, 3));
+        clearTimeout(timer2);
+        try {
+          const cached = await getAlertasCache<AlertaItem>(session.propriedadeId);
+          setAlertas(cached.slice(0, 3));
+        } catch { /* sem cache disponível */ }
       } finally {
         setAlertasCarregando(false);
       }
@@ -185,6 +199,7 @@ export default function HomeScreen({ navigation }: Props) {
   }
 
   return (
+    <View testID="home-screen" style={{ flex: 1 }}>
     <SafeAreaView style={[styles.screen, { backgroundColor: PRIMARY }]} edges={['top', 'left', 'right']}>
       <StatusBar style="light" />
       <ScrollView
@@ -322,6 +337,7 @@ export default function HomeScreen({ navigation }: Props) {
           </TouchableOpacity>
 
           <TouchableOpacity
+            testID="btn-ver-rebanho"
             style={styles.botaoSecundario}
             onPress={() => navigation.navigate('AnimalList')}
           >
@@ -343,6 +359,7 @@ export default function HomeScreen({ navigation }: Props) {
 
       <BottomMenu activeItem="Início" navigation={navigation} />
     </SafeAreaView>
+    </View>
   );
 }
 

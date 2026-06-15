@@ -206,6 +206,7 @@ function Field({ label, ...props }: React.ComponentProps<typeof TextInput> & { l
         maxLength={props.maxLength}
         multiline={props.multiline}
         textAlignVertical={props.multiline ? 'top' : 'center'}
+        testID={props.testID}
       />
     </>
   );
@@ -447,16 +448,17 @@ function VacinaModal({
             <View style={styles.chips}>
               {VACINAS.map(v => (
                 <TouchableOpacity key={v}
+                  testID={`chip-vacina-${v.toLowerCase()}`}
                   style={[styles.chip, form.nomeVacina === v && styles.chipAtivo]}
                   onPress={() => onChange({ ...form, nomeVacina: v === 'Outra' ? '' : v })}>
                   <Text style={[styles.chipTexto, form.nomeVacina === v && styles.chipTextoAtivo]}>{v}</Text>
                 </TouchableOpacity>
               ))}
             </View>
-            <Field label="Vacina" value={form.nomeVacina} onChangeText={v => onChange({ ...form, nomeVacina: v })} />
+            <Field label="Vacina" value={form.nomeVacina} onChangeText={v => onChange({ ...form, nomeVacina: v })} testID="input-nome-vacina" />
             <Field label="Data de aplicacao" value={form.dataAplicacao}
               onChangeText={v => onChange({ ...form, dataAplicacao: formatarDataBrasileira(v) })}
-              keyboardType="number-pad" maxLength={10} />
+              keyboardType="number-pad" maxLength={10} testID="input-data-vacina" />
             <Field label="Dose" value={form.dose} onChangeText={v => onChange({ ...form, dose: v })} placeholder="Ex: 1 dose" />
             <Field label="Observacao" value={form.observacao} onChangeText={v => onChange({ ...form, observacao: v })} multiline />
 
@@ -480,7 +482,7 @@ function VacinaModal({
               <TouchableOpacity style={styles.botaoCancelar} onPress={onClose} disabled={saving}>
                 <Text style={styles.botaoCancelarTexto}>Cancelar</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.botaoSalvar} onPress={onSave} disabled={saving}>
+              <TouchableOpacity testID="btn-salvar-vacina" style={styles.botaoSalvar} onPress={onSave} disabled={saving}>
                 {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.botaoSalvarTexto}>Salvar</Text>}
               </TouchableOpacity>
             </View>
@@ -511,9 +513,9 @@ function VermifugacaoModal({
 
             <Field label="Data da aplicacao" value={form.dataAplicacao}
               onChangeText={v => onChange({ ...form, dataAplicacao: formatarDataBrasileira(v) })}
-              keyboardType="number-pad" maxLength={10} />
+              keyboardType="number-pad" maxLength={10} testID="input-data-vermifugacao" />
             <Field label="Produto utilizado" value={form.produtoUtilizado}
-              onChangeText={v => onChange({ ...form, produtoUtilizado: v })} />
+              onChangeText={v => onChange({ ...form, produtoUtilizado: v })} testID="input-nome-vermifugo" />
             <Field label="Dose" value={form.dose} onChangeText={v => onChange({ ...form, dose: v })} />
             <Field label="Proxima aplicacao" value={form.proximaAplicacao}
               onChangeText={v => onChange({ ...form, proximaAplicacao: formatarDataBrasileira(v) })}
@@ -541,7 +543,7 @@ function VermifugacaoModal({
               <TouchableOpacity style={styles.botaoCancelar} onPress={onClose} disabled={saving}>
                 <Text style={styles.botaoCancelarTexto}>Cancelar</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.botaoSalvar} onPress={onSave} disabled={saving}>
+              <TouchableOpacity testID="btn-salvar-vermifugacao" style={styles.botaoSalvar} onPress={onSave} disabled={saving}>
                 {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.botaoSalvarTexto}>Salvar</Text>}
               </TouchableOpacity>
             </View>
@@ -695,13 +697,13 @@ function LoteModal({
                   <Text style={styles.passSubtitulo}>Filtrar animais por idade</Text>
                   <View style={styles.faixaChips}>
                     {MOTIVOS_LOTE.map((m, i) => (
-                      <TouchableOpacity key={m.label} style={[styles.faixaChip, faixaIdx === i && styles.faixaChipAtivo]} onPress={() => setFaixaIdx(i as FaixaIdx)}>
+                      <TouchableOpacity key={m.label} testID={`chip-faixa-${i}`} style={[styles.faixaChip, faixaIdx === i && styles.faixaChipAtivo]} onPress={() => setFaixaIdx(i as FaixaIdx)}>
                         <Text style={[styles.faixaChipTexto, faixaIdx === i && styles.faixaChipTextoAtivo]}>{m.label}</Text>
                       </TouchableOpacity>
                     ))}
                   </View>
                   <Text style={styles.faixaInfo}>{animaisFiltradosFaixa.length} animal(is) nesta faixa</Text>
-                  <TouchableOpacity style={styles.btnAvancar} onPress={aplicarFiltro}>
+                  <TouchableOpacity testID="btn-avancar-lote" style={styles.btnAvancar} onPress={aplicarFiltro}>
                     <Text style={styles.btnAvancarTexto}>Aplicar Filtro →</Text>
                   </TouchableOpacity>
                 </View>
@@ -757,25 +759,25 @@ function LoteModal({
                       <Text style={styles.label}>Nome da vacina</Text>
                       <View style={styles.chips}>
                         {VACINAS.map(v => (
-                          <TouchableOpacity key={v} style={[styles.chip, vacinaForm.nomeVacina === v && styles.chipAtivo]}
+                          <TouchableOpacity key={v} testID={`chip-vacina-${v.toLowerCase()}`} style={[styles.chip, vacinaForm.nomeVacina === v && styles.chipAtivo]}
                             onPress={() => setVacinaForm(f => ({ ...f, nomeVacina: v === 'Outra' ? '' : v }))}>
                             <Text style={[styles.chipTexto, vacinaForm.nomeVacina === v && styles.chipTextoAtivo]}>{v}</Text>
                           </TouchableOpacity>
                         ))}
                       </View>
-                      <Field label="Vacina" value={vacinaForm.nomeVacina} onChangeText={v => setVacinaForm(f => ({ ...f, nomeVacina: v }))} />
+                      <Field label="Vacina" value={vacinaForm.nomeVacina} onChangeText={v => setVacinaForm(f => ({ ...f, nomeVacina: v }))} testID="input-nome-vacina" />
                       <Field label="Data de aplicacao" value={vacinaForm.dataAplicacao}
                         onChangeText={v => setVacinaForm(f => ({ ...f, dataAplicacao: formatarDataBrasileira(v) }))}
-                        keyboardType="number-pad" maxLength={10} />
+                        keyboardType="number-pad" maxLength={10} testID="input-data-lote" />
                       <Field label="Dose (opcional)" value={vacinaForm.dose} onChangeText={v => setVacinaForm(f => ({ ...f, dose: v }))} />
                       <Field label="Observacao (opcional)" value={vacinaForm.observacao} onChangeText={v => setVacinaForm(f => ({ ...f, observacao: v }))} multiline />
                     </>
                   ) : (
                     <>
-                      <Field label="Produto utilizado" value={vermifForm.produto} onChangeText={v => setVermifForm(f => ({ ...f, produto: v }))} />
+                      <Field label="Produto utilizado" value={vermifForm.produto} onChangeText={v => setVermifForm(f => ({ ...f, produto: v }))} testID="input-nome-vermifugo" />
                       <Field label="Data de aplicacao" value={vermifForm.dataAplicacao}
                         onChangeText={v => setVermifForm(f => ({ ...f, dataAplicacao: formatarDataBrasileira(v) }))}
-                        keyboardType="number-pad" maxLength={10} />
+                        keyboardType="number-pad" maxLength={10} testID="input-data-lote" />
                       <Field label="Dose/Dosagem (opcional)" value={vermifForm.dose} onChangeText={v => setVermifForm(f => ({ ...f, dose: v }))} />
                       <Field label="Observacao (opcional)" value={vermifForm.observacao} onChangeText={v => setVermifForm(f => ({ ...f, observacao: v }))} multiline />
                     </>
@@ -797,7 +799,7 @@ function LoteModal({
                     <TouchableOpacity style={styles.botaoCancelar} onPress={() => setPasso(2)} disabled={salvando}>
                       <Text style={styles.botaoCancelarTexto}>← Voltar</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.botaoSalvar} onPress={salvar} disabled={salvando}>
+                    <TouchableOpacity testID="btn-aplicar-lote" style={styles.botaoSalvar} onPress={salvar} disabled={salvando}>
                       {salvando
                         ? <><ActivityIndicator color="#fff" size="small" /><Text style={[styles.botaoSalvarTexto, { marginLeft: 6 }]}>{mensagemSalvando}</Text></>
                         : <Text style={styles.botaoSalvarTexto}>Confirmar e Salvar</Text>}
@@ -815,10 +817,10 @@ function LoteModal({
 
 // ── Card expansível ───────────────────────────────────────────────────────────
 function CardExpansivel({
-  label, count, cor, animaisGrupo, onRegistrarVacina,
+  label, count, cor, animaisGrupo, onRegistrarVacina, testID,
 }: {
   label: string; count: number; cor: string;
-  animaisGrupo: AnimalSaude[]; onRegistrarVacina: (animalId: number) => void;
+  animaisGrupo: AnimalSaude[]; onRegistrarVacina: (animalId: number) => void; testID?: string;
 }) {
   const [aberto, setAberto] = useState(false);
   const rotAnim = useRef(new Animated.Value(0)).current;
@@ -832,7 +834,7 @@ function CardExpansivel({
   const rotacao = rotAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '90deg'] });
 
   return (
-    <View style={[styles.accordionCard, { borderLeftColor: cor }]}>
+    <View testID={testID} style={[styles.accordionCard, { borderLeftColor: cor }]}>
       <TouchableOpacity style={styles.accordionHeader} onPress={toggle} activeOpacity={0.75}>
         <Text style={[styles.accordionNumero, { color: cor }]}>{count}</Text>
         <Text style={styles.accordionLabel}>{label}</Text>
@@ -1236,13 +1238,13 @@ export default function SaudeScreen({ navigation }: Props) {
 
         {/* Cards expansíveis de status */}
         <View style={styles.accordionSection}>
-          <CardExpansivel label="Atrasadas" count={resumo.atrasadas} cor={COR_ATRASADA}
+          <CardExpansivel testID="chip-atrasada" label="Atrasadas" count={resumo.atrasadas} cor={COR_ATRASADA}
             animaisGrupo={animais.filter(a => a.status === 'Atrasada')}
             onRegistrarVacina={(animalId) => { setForm({ ...formInicial, animalId }); setModalVacina(true); }} />
-          <CardExpansivel label="Pendentes" count={resumo.pendentes} cor={COR_PENDENTE}
+          <CardExpansivel testID="chip-pendente" label="Pendentes" count={resumo.pendentes} cor={COR_PENDENTE}
             animaisGrupo={animais.filter(a => a.status === 'Pendente')}
             onRegistrarVacina={(animalId) => { setForm({ ...formInicial, animalId }); setModalVacina(true); }} />
-          <CardExpansivel label="Em dia" count={resumo.emDia} cor={COR_EM_DIA}
+          <CardExpansivel testID="chip-em-dia" label="Em dia" count={resumo.emDia} cor={COR_EM_DIA}
             animaisGrupo={animais.filter(a => a.status === 'Em dia')}
             onRegistrarVacina={(animalId) => { setForm({ ...formInicial, animalId }); setModalVacina(true); }} />
         </View>
@@ -1250,27 +1252,27 @@ export default function SaudeScreen({ navigation }: Props) {
         {carregando && <View style={styles.centro}><ActivityIndicator color={PRIMARY} /></View>}
 
         {/* Botões individuais */}
-        <TouchableOpacity style={styles.botaoRegistrarTopo} onPress={() => { setForm(formInicial); setModalVacina(true); }}>
+        <TouchableOpacity testID="btn-registrar-vacina" style={styles.botaoRegistrarTopo} onPress={() => { setForm(formInicial); setModalVacina(true); }}>
           <Text style={styles.botaoRegistrarTopoTexto}>+ Registrar vacina</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.botaoSecundarioTopo} onPress={() => { setVermifugacaoForm(vermifugacaoInicial); setModalVermifugacao(true); }}>
+        <TouchableOpacity testID="btn-registrar-vermifugacao" style={styles.botaoSecundarioTopo} onPress={() => { setVermifugacaoForm(vermifugacaoInicial); setModalVermifugacao(true); }}>
           <Text style={styles.botaoSecundarioTopoTexto}>Registrar vermifugacao</Text>
         </TouchableOpacity>
 
         {/* Botões de lote */}
         <View style={styles.loteRow}>
-          <TouchableOpacity style={styles.botaoLote} onPress={() => abrirLote('vacina')}>
+          <TouchableOpacity testID="btn-vacinar-lote" style={styles.botaoLote} onPress={() => abrirLote('vacina')}>
             <Ionicons name="list-outline" size={15} color="#fff" />
             <Text style={styles.botaoLoteTexto}>Vacinar Lote</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.botaoLoteSecundario} onPress={() => abrirLote('vermifugacao')}>
+          <TouchableOpacity testID="btn-vermifugar-lote" style={styles.botaoLoteSecundario} onPress={() => abrirLote('vermifugacao')}>
             <Ionicons name="list-outline" size={15} color={PRIMARY} />
             <Text style={styles.botaoLoteSecundarioTexto}>Vermifugar Lote</Text>
           </TouchableOpacity>
         </View>
 
         {/* Gerenciar Estoque */}
-        <TouchableOpacity style={styles.botaoEstoque} onPress={() => navigation.navigate('Estoque')}>
+        <TouchableOpacity testID="btn-gerenciar-estoque" style={styles.botaoEstoque} onPress={() => navigation.navigate('Estoque')}>
           <View style={styles.botaoEstoqueInner}>
             <Ionicons name="cube-outline" size={16} color="#92400e" />
             <Text style={styles.botaoEstoqueTexto}>Gerenciar Estoque</Text>
@@ -1283,12 +1285,12 @@ export default function SaudeScreen({ navigation }: Props) {
         </TouchableOpacity>
 
         {/* Acesso ao Afastamento */}
-        <TouchableOpacity style={styles.botaoAfastamento} onPress={() => navigation.navigate('Afastamento')}>
+        <TouchableOpacity testID="btn-afastamento" style={styles.botaoAfastamento} onPress={() => navigation.navigate('Afastamento')}>
           <Text style={styles.botaoAfastamentoTexto}>Controle de Afastamento (PL 04/07)</Text>
         </TouchableOpacity>
 
         {/* Histórico */}
-        <TouchableOpacity style={styles.botaoHistorico} onPress={() => setModalHistoricoVisivel(true)}>
+        <TouchableOpacity testID="btn-historico-vacinas" style={styles.botaoHistorico} onPress={() => setModalHistoricoVisivel(true)}>
           <Ionicons name="time-outline" size={16} color={PRIMARY} />
           <Text style={styles.botaoHistoricoTexto}>Ver Histórico de Vacinas</Text>
         </TouchableOpacity>

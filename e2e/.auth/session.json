@@ -1,0 +1,18 @@
+{
+  "cookies": [],
+  "origins": [
+    {
+      "origin": "http://localhost:8081",
+      "localStorage": [
+        {
+          "name": "@agrocontrol:session",
+          "value": "{\"id\":1,\"nome\":\"admin\",\"usuario\":\"admin\",\"email\":\"arsiris@gmail.com\",\"propriedadeId\":1,\"propriedade\":{\"nome\":\"Fazenda São Geraldo\",\"cidade\":\"\",\"estado\":\"  \",\"focoProdutivo\":\"leite\"}}"
+        },
+        {
+          "name": "@agrocontrol:senha",
+          "value": "1234"
+        }
+      ]
+    }
+  ]
+}

@@ -163,6 +163,8 @@ export default function CadastroAnimalScreen({ navigation, route }: Props) {
   const [dataEntrada, setDataEntrada] = useState('');
   const [dataSaida, setDataSaida] = useState('');
   const [valor, setValor] = useState('');
+  const [numeroPai, setNumeroPai] = useState('');
+  const [numeroMae, setNumeroMae] = useState('');
   const [motivoSaida, setMotivoSaida] = useState('');
   const [observacao, setObservacao] = useState('');
   const [fotos, setFotos] = useState<FotoSelecionada[]>([]);
@@ -571,12 +573,12 @@ export default function CadastroAnimalScreen({ navigation, route }: Props) {
           </View>
 
           <Section title="Identificação do Animal">
-            <Field label="Brinco" required value={brinco} onChangeText={(t) => { setBrinco(t); setBrincoErro(null); }} placeholder="Ex: BR-006" editable={!modoEdicao} disabled={modoEdicao} autoCapitalize="characters" />
+            <Field label="Brinco" required testID="input-brinco" value={brinco} onChangeText={(t) => { setBrinco(t); setBrincoErro(null); }} placeholder="Ex: BR-006" editable={!modoEdicao} disabled={modoEdicao} autoCapitalize="characters" />
             {brincoErro && <Text style={styles.erroInline}>{brincoErro}</Text>}
-            <Field label="Nome" value={nome} onChangeText={setNome} placeholder="Ex: Mimosa" />
+            <Field label="Nome" testID="input-nome" value={nome} onChangeText={setNome} placeholder="Ex: Mimosa" />
 
             <Text style={styles.label}>Raça <Text style={styles.obrigatorio}>*</Text></Text>
-            <ChipGroup options={RACAS} value={racaChip} onChange={(op) => { setRacaChip(op); setRacaCustom(''); }} />
+            <ChipGroup options={RACAS} value={racaChip} onChange={(op) => { setRacaChip(op); setRacaCustom(''); }} testIDPrefix="chip-raca" />
             {racaChip === 'Outra' && (
               <Field value={racaCustom} onChangeText={setRacaCustom} placeholder="Digite a raça..." compact />
             )}
@@ -606,6 +608,7 @@ export default function CadastroAnimalScreen({ navigation, route }: Props) {
               {(['F', 'M'] as const).map((s) => (
                 <TouchableOpacity
                   key={s}
+                  testID={`btn-sexo-${s === 'F' ? 'femea' : 'macho'}`}
                   style={[styles.opcao, sexo === s && styles.opcaoSelecionada]}
                   onPress={() => { setSexo(s); setTipoChip(''); setTipoCustom(''); }}
                 >
@@ -620,7 +623,7 @@ export default function CadastroAnimalScreen({ navigation, route }: Props) {
             {sexo === '' ? (
               <Text style={{ color: '#888', fontSize: 13, marginBottom: 8 }}>Selecione o sexo antes de escolher o tipo</Text>
             ) : (
-              <ChipGroup options={tiposDisponiveis} value={tipoChip} onChange={(op) => { setTipoChip(op); setTipoCustom(''); }} />
+              <ChipGroup options={tiposDisponiveis} value={tipoChip} onChange={(op) => { setTipoChip(op); setTipoCustom(''); }} testIDPrefix="chip-tipo" />
             )}
             {(tipoChip === 'Outra' || tipoChip === 'Outro') && (
               <Field value={tipoCustom} onChangeText={setTipoCustom} placeholder="Digite o tipo..." compact />
@@ -654,6 +657,7 @@ export default function CadastroAnimalScreen({ navigation, route }: Props) {
             />
             {paiStatus && <Text style={[styles.statusBusca, paiStatus.tipo === 'sucesso' && styles.statusBuscaSucesso]}>{paiStatus.mensagem}</Text>}
             <Field label="Nome do pai" value={nomePai} onChangeText={setNomePai} placeholder="Ex: Catague" />
+            <Field label="Nº do pai" value={numeroPai} onChangeText={setNumeroPai} placeholder="Ex: 001" />
             <Field label="Raca do pai" value={racaPai} onChangeText={setRacaPai} placeholder="Ex: Gir" />
             <Field
               label="Brinco da mae"
@@ -664,6 +668,7 @@ export default function CadastroAnimalScreen({ navigation, route }: Props) {
             />
             {maeStatus && <Text style={[styles.statusBusca, maeStatus.tipo === 'sucesso' && styles.statusBuscaSucesso]}>{maeStatus.mensagem}</Text>}
             <Field label="Nome da mãe" value={nomeMae} onChangeText={setNomeMae} placeholder="Ex: Pitanga" />
+            <Field label="Nº da mãe" value={numeroMae} onChangeText={setNumeroMae} placeholder="Ex: 003" />
             <Field label="Raça da mãe" value={racaMae} onChangeText={setRacaMae} placeholder="Ex: Holandesa" />
           </Section>
 
@@ -762,6 +767,7 @@ export default function CadastroAnimalScreen({ navigation, route }: Props) {
           </Section>
 
           <TouchableOpacity
+            testID="btn-salvar-animal"
             style={[styles.botao, salvando && styles.botaoDesabilitado]}
             onPress={handleSalvar}
           >
@@ -942,17 +948,20 @@ function ChipGroup({
   value,
   onChange,
   square,
+  testIDPrefix,
 }: {
   options: string[];
   value: string;
   onChange: (value: string) => void;
   square?: boolean;
+  testIDPrefix?: string;
 }) {
   return (
     <View style={styles.grupo}>
       {options.map((op) => (
         <TouchableOpacity
           key={op}
+          testID={testIDPrefix ? `${testIDPrefix}-${op.toLowerCase()}` : undefined}
           style={[
             square ? styles.opcao : styles.chip,
             value === op && (square ? styles.opcaoSelecionada : styles.chipSelecionado),

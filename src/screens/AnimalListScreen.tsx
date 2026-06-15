@@ -285,6 +285,7 @@ export default function AnimalListScreen({ navigation }: Props) {
 
           <View style={styles.headerIcons}>
             <TouchableOpacity
+              testID="btn-abrir-busca"
               style={styles.headerIconBtn}
               onPress={() => {
                 setBuscaVisivel(v => !v);
@@ -317,6 +318,7 @@ export default function AnimalListScreen({ navigation }: Props) {
           {CHIPS_RAPIDOS.map(chip => (
             <TouchableOpacity
               key={chip}
+              testID={`chip-filtro-${chip.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')}`}
               style={[
                 styles.chipRapido,
                 chipRapido === chip && styles.chipRapidoAtivo,
@@ -339,6 +341,7 @@ export default function AnimalListScreen({ navigation }: Props) {
           <View style={styles.buscaRow}>
             <Ionicons name="search-outline" size={16} color="#a8d5b5" style={{ marginLeft: 12 }} />
             <TextInput
+              testID="input-busca-animal"
               style={styles.buscaInput}
               value={textoBusca}
               onChangeText={setTextoBusca}
@@ -442,7 +445,7 @@ export default function AnimalListScreen({ navigation }: Props) {
               >
                 <Text style={styles.modalBotaoCancelarTexto}>Cancelar</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.modalBotaoExcluir} onPress={handleExcluir}>
+              <TouchableOpacity testID="btn-confirmar-exclusao" style={styles.modalBotaoExcluir} onPress={handleExcluir}>
                 {excluindo
                   ? <ActivityIndicator color="#fff" size="small" />
                   : <Text style={styles.modalBotaoExcluirTexto}>Excluir</Text>}

@@ -6,7 +6,9 @@
       "Bash(npx ngrok *)",
       "Bash(dotnet build *)",
       "PowerShell(& \".specify/scripts/powershell/check-prerequisites.ps1\" -Json -RequireTasks -IncludeTasks)",
-      "PowerShell(& \".specify/extensions/git/scripts/powershell/auto-commit.ps1\" \"after_implement\")"
+      "PowerShell(& \".specify/extensions/git/scripts/powershell/auto-commit.ps1\" \"after_implement\")",
+      "Bash(npx playwright *)",
+      "Bash(curl -s --max-time 5 http://localhost:8081 -o /dev/null -w \"%{http_code}\")"
     ]
   }
 }

@@ -162,9 +162,16 @@ at specs/001-api-telas-pendentes/plan.md
 
 ## Phase 2: Implementation Tasks
 
-Gerado pelo comando `/speckit-tasks` — ver `tasks.md` (pendente).
+Gerado pelo comando `/speckit-tasks` — ver [`tasks.md`](tasks.md) ✅ (gerado e em execução).
 
-Resumo de alto nível das tarefas esperadas:
+**Progresso atual** (ao re-planejar em 2026-06-14):
+- T002–T004 ✅ `mapa_cache` adicionado a `localDb.ts`
+- T005–T008 ✅ FinanceiroScreen endpoints auditados e corrigidos
+- T010–T012 ✅ RelatoriosScreen offline fallback verificado
+- T014–T018 ✅ MapaPropriedadeScreen migrado para SQLite + useNetworkStatus
+- Pendente: T001 (verificar backend ativo), T009 T013 T019 (smoke tests manuais), T020–T021 (validação final)
+
+Resumo de alto nível das tarefas:
 
 ### T1 — localDb.ts: adicionar mapa_cache
 - Adicionar DDL `mapa_cache` em `initDatabase()`

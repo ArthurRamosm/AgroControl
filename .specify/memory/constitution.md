@@ -1,20 +1,22 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 1.0.0 → 1.1.0
-Rationale: MINOR bump — added Backend Architecture section, expanded Technology
-& Platform Standards with full stack details (.NET Core + SQL Server LocalDB),
-added Project Status section, updated offline-first principle to reference
-useNetworkStatus hook, corrected dev-server entry.
+Version change: 1.1.0 → 1.2.0
+Rationale: MINOR bump — added Estoque to Backend Architecture (omitted in v1.1.0),
+added 16 new screens to Frontend API Integration Status (EstoqueScreen, FazendaScreen,
+3 Saúde sub-screens, 2 Financeiro sub-screens, 10 Queijaria screens), added Queijaria
+as a new operational domain pending backend integration, added fazendaSchema.ts to
+Technology & Platform Standards, updated Principle IV to name Queijaria as the new
+pending domain alongside the original three.
 
 Modified principles:
-  - I. Offline-First: added useNetworkStatus hook reference
-  - (all others unchanged)
+  - IV. API-First Data Flow: added Queijaria domain to pending integration list
 
-Added sections:
-  - Technology & Platform Standards: backend stack details
-  - Backend Architecture: controllers, API contract, API-integration status
-  - Project Status: implemented screens, pending screens
+Added content:
+  - Technology & Platform Standards: fazendaSchema.ts note
+  - Backend Architecture / API Controllers: Estoque row
+  - Backend Architecture / Frontend API Integration Status: 16 new screen rows
+  - Backend Architecture: new "Queijaria Domain" subsection explaining local-only state
 
 Removed sections: none
 
@@ -22,6 +24,7 @@ Templates updated:
   - .specify/templates/plan-template.md  ✅ no changes required
   - .specify/templates/spec-template.md  ✅ no changes required
   - .specify/templates/tasks-template.md ✅ no changes required
+  - .specify/templates/commands/         ✅ no files exist — nothing to update
 
 Deferred TODOs: none
 -->
@@ -75,16 +78,25 @@ local cache; reads from SQLite are acceptable offline but MUST be invalidated
 and refreshed on next sync. New screens MUST NOT use json-server or static
 fixtures in production code — only the .NET Core backend.
 
-The three screens still pending API integration (Financeiro, Relatórios,
-MapaPropriedade) MUST be connected to their respective backend controllers
-before any new features are added on top of them.
+The screens still pending full API integration are:
+
+- **FinanceiroScreen** — endpoint verification and correction in progress
+- **RelatoriosScreen** — offline fallback completeness to be confirmed
+- **MapaPropriedadeScreen** — needs migration from AsyncStorage to SQLite + sync queue
+- **Queijaria domain** (10 screens) — backend controllers do not yet exist; screens
+  operate in local-only mode (SQLite via `fazendaSchema.ts`) until the Queijaria
+  backend is implemented
+
+These screens MUST be connected to their respective backend controllers before
+new features are layered on top of them.
 
 ### V. Data Integrity
 
-Agricultural records — animals, health events, financial entries, and property
-areas — are operationally critical. Writes MUST be atomic at the SQLite level.
-Data MUST never be silently dropped; if a sync operation fails, the record
-MUST remain in the queue and retry on the next connectivity event.
+Agricultural records — animals, health events, financial entries, property
+areas, dairy production logs, and stock items — are operationally critical.
+Writes MUST be atomic at the SQLite level. Data MUST never be silently dropped;
+if a sync operation fails, the record MUST remain in the queue and retry on the
+next connectivity event.
 
 Delete operations on livestock or financial records MUST be soft-deletes or
 require explicit user confirmation. Destructive operations without user
@@ -98,9 +110,9 @@ MUST use clear Portuguese labels, the primary brand color `#0d2b10`, and
 provide inline feedback on errors.
 
 New features MUST NOT increase the number of taps required for the most common
-workflows (animal registration, health logging, financial entry). Complexity
-added for edge cases MUST be hidden behind progressive disclosure (secondary
-menus, detail screens) rather than cluttering primary flows.
+workflows (animal registration, health logging, financial entry, dairy production
+recording). Complexity added for edge cases MUST be hidden behind progressive
+disclosure (secondary menus, detail screens) rather than cluttering primary flows.
 
 ## Technology & Platform Standards
 
@@ -112,6 +124,7 @@ menus, detail screens) rather than cluttering primary flows.
 | Language | TypeScript ~5.9 — strict mode MUST be enabled |
 | Navigation | React Navigation v7 (native stack + bottom tabs) |
 | Local storage | expo-sqlite ~16 (business records); AsyncStorage (session/prefs only) |
+| Schema files | `src/database/localDb.ts` (core schema + sync helpers); `src/database/fazendaSchema.ts` (Queijaria + new domain tables, `FAZENDA_SCHEMA_VERSION`) |
 | Connectivity | @react-native-community/netinfo + `useNetworkStatus` hook |
 | Media | expo-image-picker (photos), expo-print + expo-sharing (PDFs) |
 | Maps | react-leaflet + Leaflet (web target), scoped to MapaPropriedade |
@@ -146,8 +159,9 @@ iOS, and Web. All new backend dependencies MUST target .NET Core LTS.
 | Afastamentos | Animal withdrawal / quarantine records |
 | Relatorios | Report generation endpoints |
 | Propriedades | Farm property management |
-| Areas | Property area / zone management |
-| Pontos | Geographic points of interest |
+| PropriedadeAreas | Property area / zone management |
+| PropriedadePontos | Geographic points of interest |
+| Estoque | Veterinary stock / medication inventory |
 
 ### Frontend API Integration Status
 
@@ -160,13 +174,47 @@ iOS, and Web. All new backend dependencies MUST target .NET Core LTS.
 | CadastroAnimalScreen | ✅ Animais |
 | AnimalDetailsScreen | ✅ AnimalFicha |
 | SaudeScreen | ✅ Saude |
+| MastiteClinicaScreen | ✅ Saude |
+| MastiteSubclinicaScreen | ✅ Saude |
+| ParasitasScreen | ✅ Saude |
 | AnimalReportScreen | ✅ Relatorios (animal-scoped) |
-| **FinanceiroScreen** | ⚠️ **PENDING — must connect to Financeiro** |
-| **RelatoriosScreen** | ⚠️ **PENDING — must connect to Relatorios** |
-| **MapaPropriedadeScreen** | ⚠️ **PENDING — must connect to Propriedades/Areas/Pontos** |
+| AfastamentoScreen | ✅ Afastamentos |
+| EstoqueScreen | ✅ Estoque |
+| FazendaScreen | ✅ (hub/navigation — no direct API calls) |
+| DespesaDetalheScreen | ✅ Financeiro |
+| ReceitaDetalheScreen | ✅ Financeiro |
+| **FinanceiroScreen** | ⚠️ **PENDING — endpoint verification/correction in progress** |
+| **RelatoriosScreen** | ⚠️ **PENDING — offline fallback completeness to be confirmed** |
+| **MapaPropriedadeScreen** | ⚠️ **PENDING — must migrate to SQLite + useNetworkStatus** |
+| **ProducaoDiariaScreen** | ⚠️ **PENDING — no Queijaria backend controller yet** |
+| **PotabilidadeScreen** | ⚠️ **PENDING — no Queijaria backend controller yet** |
+| **HigieneCaixaScreen** | ⚠️ **PENDING — no Queijaria backend controller yet** |
+| **AnaliseLabScreen** | ⚠️ **PENDING — no Queijaria backend controller yet** |
+| **RastreabilidadeScreen** | ⚠️ **PENDING — no Queijaria backend controller yet** |
+| **HigienizacaoEquipScreen** | ⚠️ **PENDING — no Queijaria backend controller yet** |
+| **CondicoesVestiarioScreen** | ⚠️ **PENDING — no Queijaria backend controller yet** |
+| **DepositoLimpezaScreen** | ⚠️ **PENDING — no Queijaria backend controller yet** |
+| **ControleLeiteiroScreen** | ⚠️ **PENDING — no Queijaria backend controller yet** |
+| **VendaQueijoScreen** | ⚠️ **PENDING — no Queijaria backend controller yet** |
 
 Screens marked ⚠️ MUST be API-integrated before new features are layered on
 top of them (see Principle IV).
+
+### Queijaria Domain (Local-Only, Pending Backend)
+
+The 10 Queijaria screens implement dairy processing checklists (PL 01/01
+through PL series: water hygiene, potability, lab analyses, traceability,
+equipment sanitation, vestiaire conditions, storage cleaning, milk control,
+and cheese sales). Their SQLite schema is defined in `fazendaSchema.ts`
+(version-managed via `FAZENDA_SCHEMA_VERSION`).
+
+These screens currently operate in **local-only mode** — data is persisted to
+SQLite but never synced to a backend, because the corresponding .NET Core
+Queijaria controllers do not yet exist. When Queijaria backend controllers are
+implemented, the sync queue pattern used by other screens MUST be applied here.
+Until then, this represents a known, intentional deviation from Principle IV
+and MUST be tracked in the `Complexity Tracking` table of any plan that extends
+the Queijaria domain.
 
 ## Development Workflow
 
@@ -205,4 +253,4 @@ with the six core principles. Violations MUST be justified in the
 Runtime development guidance lives in `CLAUDE.md` (project root) and the
 `.specify/` directory.
 
-**Version**: 1.1.0 | **Ratified**: 2026-06-02 | **Last Amended**: 2026-06-02
+**Version**: 1.2.0 | **Ratified**: 2026-06-02 | **Last Amended**: 2026-06-14

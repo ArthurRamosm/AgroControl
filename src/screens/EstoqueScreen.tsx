@@ -340,6 +340,7 @@ export default function EstoqueScreen({ navigation }: Props) {
         {(['Vacinas', 'Medicamentos', 'Histórico'] as Tab[]).map(t => (
           <TouchableOpacity
             key={t}
+            testID={`aba-${t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')}`}
             style={[styles.tabItem, tab === t && styles.tabItemAtivo]}
             onPress={() => setTab(t)}
           >
@@ -433,6 +434,7 @@ export default function EstoqueScreen({ navigation }: Props) {
           {/* FAB: Novo Medicamento */}
           {tab !== 'Histórico' && (
             <TouchableOpacity
+              testID="btn-adicionar-item-estoque"
               style={[styles.fab, { bottom: 24 + insets.bottom }]}
               onPress={() => { setNovoTipo(tab === 'Vacinas' ? 'Vacina' : 'Vermifugo'); setModalNovo(true); }}
             >
@@ -450,12 +452,12 @@ export default function EstoqueScreen({ navigation }: Props) {
             <Text style={styles.modalTitulo}>Novo Medicamento</Text>
 
             <Text style={styles.label}>Nome *</Text>
-            <TextInput style={styles.input} value={novoNome} onChangeText={setNovoNome} placeholder="Ex: Brucelose B19" placeholderTextColor="#aaa" />
+            <TextInput testID="input-nome-medicamento" style={styles.input} value={novoNome} onChangeText={setNovoNome} placeholder="Ex: Brucelose B19" placeholderTextColor="#aaa" />
 
             <Text style={styles.label}>Tipo</Text>
             <View style={styles.chips}>
               {TIPOS.map(t => (
-                <TouchableOpacity key={t} style={[styles.chip, novoTipo === t && styles.chipAtivo]} onPress={() => setNovoTipo(t)}>
+                <TouchableOpacity key={t} testID={`chip-tipo-estoque-${t.toLowerCase()}`} style={[styles.chip, novoTipo === t && styles.chipAtivo]} onPress={() => setNovoTipo(t)}>
                   <Text style={[styles.chipTexto, novoTipo === t && styles.chipTextoAtivo]}>{t}</Text>
                 </TouchableOpacity>
               ))}
@@ -464,20 +466,20 @@ export default function EstoqueScreen({ navigation }: Props) {
             <Text style={styles.label}>Unidade</Text>
             <View style={styles.chips}>
               {UNIDADES.map(u => (
-                <TouchableOpacity key={u} style={[styles.chip, novaUnidade === u && styles.chipAtivo]} onPress={() => setNovaUnidade(u)}>
+                <TouchableOpacity key={u} testID={`chip-unidade-${u}`} style={[styles.chip, novaUnidade === u && styles.chipAtivo]} onPress={() => setNovaUnidade(u)}>
                   <Text style={[styles.chipTexto, novaUnidade === u && styles.chipTextoAtivo]}>{u}</Text>
                 </TouchableOpacity>
               ))}
             </View>
 
             <Text style={styles.label}>Quantidade inicial</Text>
-            <TextInput style={styles.input} value={novaQtdInicial} onChangeText={setNovaQtdInicial} placeholder="0" placeholderTextColor="#aaa" keyboardType="decimal-pad" />
+            <TextInput testID="input-qtd-inicial" style={styles.input} value={novaQtdInicial} onChangeText={setNovaQtdInicial} placeholder="0" placeholderTextColor="#aaa" keyboardType="decimal-pad" />
 
             <Text style={styles.label}>Quantidade mínima (alerta)</Text>
-            <TextInput style={styles.input} value={novaQtdMinima} onChangeText={setNovaQtdMinima} placeholder="Ex: 5" placeholderTextColor="#aaa" keyboardType="decimal-pad" />
+            <TextInput testID="input-qtd-minima" style={styles.input} value={novaQtdMinima} onChangeText={setNovaQtdMinima} placeholder="Ex: 5" placeholderTextColor="#aaa" keyboardType="decimal-pad" />
 
             <Text style={styles.label}>Valor unitário (R$)</Text>
-            <TextInput style={styles.input} value={novoValorUnit} onChangeText={setNovoValorUnit} placeholder="Ex: 12,50" placeholderTextColor="#aaa" keyboardType="decimal-pad" />
+            <TextInput testID="input-valor-unitario" style={styles.input} value={novoValorUnit} onChangeText={setNovoValorUnit} placeholder="Ex: 12,50" placeholderTextColor="#aaa" keyboardType="decimal-pad" />
 
             <Text style={styles.label}>Observação</Text>
             <TextInput style={styles.input} value={novaObs} onChangeText={setNovaObs} placeholder="Opcional" placeholderTextColor="#aaa" />
@@ -486,7 +488,7 @@ export default function EstoqueScreen({ navigation }: Props) {
               <TouchableOpacity style={styles.botaoCancelar} onPress={() => setModalNovo(false)} disabled={salvando}>
                 <Text style={styles.botaoCancelarTexto}>Cancelar</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.botaoSalvar} onPress={salvarNovo} disabled={salvando}>
+              <TouchableOpacity testID="btn-salvar-item-estoque" style={styles.botaoSalvar} onPress={salvarNovo} disabled={salvando}>
                 {salvando ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.botaoSalvarTexto}>Salvar</Text>}
               </TouchableOpacity>
             </View>

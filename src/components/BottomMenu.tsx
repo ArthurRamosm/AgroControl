@@ -1,94 +1,116 @@
-import React, { ComponentProps } from 'react';
-import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import React from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Platform,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useNavigation, useRoute } from '@react-navigation/native';
 
-const PRIMARY = '#1a3d1f';
-const noTranslateProps =
-  Platform.OS === 'web'
-    ? ({ translate: 'no', className: 'notranslate' } as any)
-    : {};
+const PRIMARY = '#0d2b10';
+const ACTIVE_COLOR = '#0d2b10';
+const INACTIVE_COLOR = '#999';
 
-type MenuLabel = 'Início' | 'Animais' | 'Saúde' | 'Finanças' | 'Relatórios';
-type MenuRoute = 'Home' | 'AnimalList' | 'Saude' | 'Financeiro' | 'Relatorios';
-type IconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
+interface TabItem {
+  key: string;
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  activeIcon: keyof typeof Ionicons.glyphMap;
+  route: string;
+}
 
-type Props = {
-  activeItem: MenuLabel;
-  navigation: {
-    navigate: (route: MenuRoute) => void;
-  };
-};
-
-const bottomMenuItems: {
-  label: MenuLabel;
-  icon: IconName;
-  route?: MenuRoute;
-}[] = [
+const TABS: TabItem[] = [
   {
+    key: 'home',
     label: 'Início',
-    icon: 'home-variant',
+    icon: 'home-outline',
+    activeIcon: 'home',
     route: 'Home',
   },
   {
+    key: 'animais',
     label: 'Animais',
-    icon: 'cow',
+    icon: 'paw-outline',
+    activeIcon: 'paw',
     route: 'AnimalList',
   },
   {
+    key: 'saude',
     label: 'Saúde',
-    icon: 'medical-bag',
+    icon: 'medkit-outline',
+    activeIcon: 'medkit',
     route: 'Saude',
   },
   {
+    key: 'financeiro',
     label: 'Finanças',
-    icon: 'cash-multiple',
+    icon: 'cash-outline',
+    activeIcon: 'cash',
     route: 'Financeiro',
   },
   {
-    label: 'Relatórios',
-    icon: 'file-chart-outline',
-    route: 'Relatorios',
+    key: 'fazenda',
+    label: 'Fazenda',
+    icon: 'leaf-outline',
+    activeIcon: 'leaf',
+    route: 'FazendaScreen',
   },
 ];
 
-export default function BottomMenu({ activeItem, navigation }: Props) {
-  const insets = useSafeAreaInsets();
+// Rotas que pertencem a cada aba (para destacar o tab correto em sub-telas)
+const ROUTE_MAP: Record<string, string> = {
+  Home: 'home',
+  AnimalList: 'animais',
+  CadastroAnimal: 'animais',
+  AnimalDetails: 'animais',
+  AnimalReport: 'animais',
+  Saude: 'saude',
+  Afastamento: 'saude',
+  MastiteClinica: 'saude',
+  MastiteSubclinica: 'saude',
+  Parasitas: 'saude',
+  Financeiro: 'financeiro',
+  FazendaScreen: 'fazenda',
+  ProducaoDiaria: 'fazenda',
+  ControleLeiteiro: 'fazenda',
+  VendaQueijo: 'fazenda',
+  Potabilidade: 'fazenda',
+  HigieneCaixa: 'fazenda',
+  AnaliseLabScreen: 'fazenda',
+  Rastreabilidade: 'fazenda',
+  HigienizacaoEquip: 'fazenda',
+  CondicoesVestiario: 'fazenda',
+  DepositoLimpeza: 'fazenda',
+  Relatorios: 'fazenda',
+};
 
-  function handlePress(route?: MenuRoute) {
-    if (!route) return;
-    navigation.navigate(route);
-  }
+export default function BottomMenu() {
+  const navigation = useNavigation<any>();
+  const route = useRoute();
+  const activeKey = ROUTE_MAP[route.name] ?? '';
 
   return (
-    <View style={[styles.bottomMenu, {
-      height: 80 + insets.bottom,
-      paddingBottom: 12 + insets.bottom,
-    }]}>
-      {bottomMenuItems.map(item => {
-        const active = item.label === activeItem;
-
+    <View style={styles.container}>
+      {TABS.map((tab) => {
+        const isActive = activeKey === tab.key;
         return (
           <TouchableOpacity
-            key={item.label}
-            style={styles.bottomMenuItem}
-            activeOpacity={0.75}
-            onPress={() => handlePress(item.route)}
+            key={tab.key}
+            style={styles.tab}
+            onPress={() => navigation.navigate(tab.route)}
+            activeOpacity={0.7}
           >
-            <MaterialCommunityIcons
-              name={item.icon}
-              size={23}
-              color={active ? PRIMARY : '#8f9892'}
+            <Ionicons
+              name={isActive ? tab.activeIcon : tab.icon}
+              size={24}
+              color={isActive ? ACTIVE_COLOR : INACTIVE_COLOR}
             />
-            <Text
-              {...noTranslateProps}
-              style={[
-                styles.bottomMenuText,
-                active && styles.bottomMenuTextActive,
-              ]}
-            >
-              {item.label}
+            <Text style={[styles.label, isActive && styles.labelActive]}>
+              {tab.label}
             </Text>
+            {isActive && <View style={styles.indicator} />}
           </TouchableOpacity>
         );
       })}
@@ -97,38 +119,41 @@ export default function BottomMenu({ activeItem, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  bottomMenu: {
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
-    bottom: 0,
-    elevation: 12,
+  container: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    left: 0,
-    paddingHorizontal: 12,
-    paddingTop: 12,
-    position: 'absolute',
-    right: 0,
-    shadowColor: '#153d2e',
-    shadowOffset: { width: 0, height: -6 },
-    shadowOpacity: 0.10,
-    shadowRadius: 14,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#e8e8e8',
+    paddingBottom: Platform.OS === 'ios' ? 20 : 8,
+    paddingTop: 8,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
   },
-  bottomMenuItem: {
-    alignItems: 'center',
+  tab: {
     flex: 1,
-    height: 64,
+    alignItems: 'center',
     justifyContent: 'center',
+    gap: 2,
+    position: 'relative',
   },
-  bottomMenuText: {
-    color: '#8f9892',
-    fontSize: 11,
+  label: {
+    fontSize: 10,
+    color: INACTIVE_COLOR,
+    fontWeight: '500',
+  },
+  labelActive: {
+    color: ACTIVE_COLOR,
     fontWeight: '700',
-    marginTop: 5,
   },
-  bottomMenuTextActive: {
-    color: PRIMARY,
+  indicator: {
+    position: 'absolute',
+    top: -8,
+    width: 20,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: PRIMARY,
   },
 });

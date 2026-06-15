@@ -97,6 +97,7 @@ export default function LoginScreen({ navigation }: Props) {
           <View style={styles.inputLinha}>
             <Ionicons name="person-outline" size={20} color={PRIMARY} style={styles.inputIcone} />
             <TextInput
+              testID="input-usuario"
               style={styles.input}
               placeholder="Usuário"
               placeholderTextColor="#bbb"
@@ -112,6 +113,7 @@ export default function LoginScreen({ navigation }: Props) {
           <View style={styles.inputLinha}>
             <Ionicons name="lock-closed-outline" size={20} color={PRIMARY} style={styles.inputIcone} />
             <TextInput
+              testID="input-senha"
               style={styles.input}
               placeholder="Senha"
               placeholderTextColor="#bbb"
@@ -132,13 +134,14 @@ export default function LoginScreen({ navigation }: Props) {
           </View>
 
  
-          {erro ? <Text style={styles.erro}>{erro}</Text> : null}
+          {erro ? <Text testID="erro-login" style={styles.erro}>{erro}</Text> : null}
 
           <TouchableOpacity style={styles.esqueceuBtn}>
             <Text style={styles.esqueceuTexto}>Esqueceu a senha?</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
+            testID="btn-entrar"
             style={[styles.botaoEntrar, carregando && styles.botaoDesabilitado]}
             onPress={handleLogin}
             activeOpacity={0.85}
@@ -156,6 +159,7 @@ export default function LoginScreen({ navigation }: Props) {
           </View>
 
           <TouchableOpacity
+            testID="btn-criar-conta"
             style={styles.botaoCadastro}
             onPress={() => navigation.navigate('Register')}
             activeOpacity={0.85}

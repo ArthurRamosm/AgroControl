@@ -25,6 +25,7 @@ import BottomMenu from '../components/BottomMenu';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { saveFinanceiroCache, getFinanceiroCache, addToSyncQueue } from '../database/localDb';
 import { formatarDataBrasileira, validarDataCompleta } from '../utils/animalHealth';
+import { CATEGORIAS_IMA_DESPESA, SUBCATEGORIAS_IMA } from '../database/fazendaSchema';
 
 const PRIMARY = '#0d2b10';
 const SCREEN_W = Dimensions.get('window').width;
@@ -86,6 +87,9 @@ type DespesaForm = {
   descricao: string;
   valor: string;
   dataDespesa: string;
+  categoriaIma: string;
+  subcategoriaIma: string;
+  dataPagamento: string;
 };
 
 type ReceitaForm = {
@@ -403,6 +407,7 @@ export default function FinanceiroScreen({ navigation }: Props) {
   // Formulários
   const [despesaForm, setDespesaForm] = useState<DespesaForm>({
     categoria: 'Racao', descricao: '', valor: '', dataDespesa: hojeBr(),
+    categoriaIma: '', subcategoriaIma: '', dataPagamento: '',
   });
   const [receitaForm, setReceitaForm] = useState<ReceitaForm>({
     tipo: 'Outros', descricao: '', valor: '', dataReceita: hojeBr(),
@@ -581,7 +586,7 @@ export default function FinanceiroScreen({ navigation }: Props) {
     };
     await postComOffline(`/api/financeiro/${propriedadeId}/despesas`, dados, 'financeiro_despesas', () => {
       setModalDespesa(false);
-      setDespesaForm({ categoria: 'Racao', descricao: '', valor: '', dataDespesa: hojeBr() });
+      setDespesaForm({ categoria: 'Racao', descricao: '', valor: '', dataDespesa: hojeBr(), categoriaIma: '', subcategoriaIma: '', dataPagamento: '' });
     });
   }
 
@@ -750,7 +755,7 @@ export default function FinanceiroScreen({ navigation }: Props) {
             <View style={styles.secao}>
               <View style={styles.resumoGrid}>
                 {/* Receita */}
-                <View style={[styles.resumoCard, styles.resumoCardReceita]}>
+                <View testID="card-receita-total" style={[styles.resumoCard, styles.resumoCardReceita]}>
                   <Text {...noTranslateProps} style={styles.resumoLabel}>Receita Total</Text>
                   <Text {...noTranslateProps} style={[styles.resumoValor, { color: '#1b5e20' }]}>
                     {fmtBRL(resumo?.receitaTotal ?? 0)}
@@ -768,7 +773,7 @@ export default function FinanceiroScreen({ navigation }: Props) {
                 </View>
 
                 {/* Custos */}
-                <View style={[styles.resumoCard, styles.resumoCardDespesa]}>
+                <View testID="card-custos-total" style={[styles.resumoCard, styles.resumoCardDespesa]}>
                   <Text {...noTranslateProps} style={styles.resumoLabel}>Custos Totais</Text>
                   <Text {...noTranslateProps} style={[styles.resumoValor, { color: '#b71c1c' }]}>
                     {fmtBRL(resumo?.despesaTotal ?? 0)}
@@ -787,7 +792,7 @@ export default function FinanceiroScreen({ navigation }: Props) {
               </View>
 
               {/* Lucro Líquido — card cheio */}
-              <View style={[styles.lucroCard, lucroPositivo ? styles.lucroCardPositivo : styles.lucroCardNegativo]}>
+              <View testID="card-lucro-liquido" style={[styles.lucroCard, lucroPositivo ? styles.lucroCardPositivo : styles.lucroCardNegativo]}>
                 <View>
                   <Text {...noTranslateProps} style={styles.lucroLabel}>Lucro Líquido</Text>
                   <Text {...noTranslateProps} style={styles.lucroValor}>
@@ -914,32 +919,32 @@ export default function FinanceiroScreen({ navigation }: Props) {
             <View style={styles.secao}>
               <Text {...noTranslateProps} style={styles.lancamentoTitulo}>Lançamentos</Text>
               <View style={styles.lancamentoGrid}>
-                <TouchableOpacity style={styles.lancamentoBtn} onPress={() => setModalVendaAnimal(true)}>
+                <TouchableOpacity testID="btn-nova-venda-animal" style={styles.lancamentoBtn} onPress={() => setModalVendaAnimal(true)}>
                   <Ionicons name="trending-up" size={22} color={PRIMARY} />
                   <Text {...noTranslateProps} style={styles.lancamentoBtnTexto}>Venda de{'\n'}Animais</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.lancamentoBtn} onPress={() => setModalCompraAnimal(true)}>
+                <TouchableOpacity testID="btn-nova-compra-animal" style={styles.lancamentoBtn} onPress={() => setModalCompraAnimal(true)}>
                   <Ionicons name="trending-down" size={22} color={PRIMARY} />
                   <Text {...noTranslateProps} style={styles.lancamentoBtnTexto}>Compra de{'\n'}Animais</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.lancamentoBtn} onPress={() => setModalDespesa(true)}>
+                <TouchableOpacity testID="btn-nova-despesa" style={styles.lancamentoBtn} onPress={() => setModalDespesa(true)}>
                   <Ionicons name="wallet-outline" size={22} color={PRIMARY} />
                   <Text {...noTranslateProps} style={styles.lancamentoBtnTexto}>Despesa{'\n'}Geral</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.lancamentoBtn} onPress={() => setModalReceita(true)}>
+                <TouchableOpacity testID="btn-nova-receita" style={styles.lancamentoBtn} onPress={() => setModalReceita(true)}>
                   <Ionicons name="cash-outline" size={22} color={PRIMARY} />
                   <Text {...noTranslateProps} style={styles.lancamentoBtnTexto}>Receita</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.lancamentoBtn} onPress={() => setModalInsumos(true)}>
+                <TouchableOpacity testID="btn-novo-insumo" style={styles.lancamentoBtn} onPress={() => setModalInsumos(true)}>
                   <MaterialCommunityIcons name="silo" size={22} color={PRIMARY} />
                   <Text {...noTranslateProps} style={styles.lancamentoBtnTexto}>Compra de{'\n'}Insumos</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.lancamentoBtn} onPress={() => setModalFuncionario(true)}>
+                <TouchableOpacity testID="btn-novo-funcionario" style={styles.lancamentoBtn} onPress={() => setModalFuncionario(true)}>
                   <Ionicons name="person-outline" size={22} color={PRIMARY} />
                   <Text {...noTranslateProps} style={styles.lancamentoBtnTexto}>Pgto.{'\n'}Funcionário</Text>
                 </TouchableOpacity>
@@ -961,10 +966,30 @@ export default function FinanceiroScreen({ navigation }: Props) {
                 value={despesaForm.categoria}
                 onChange={v => setDespesaForm(f => ({ ...f, categoria: v }))}
               />
+              <Text style={styles.label}>Categoria IMA</Text>
+              <ChipGroup
+                options={CATEGORIAS_IMA_DESPESA.map(c => c.value)}
+                value={despesaForm.categoriaIma}
+                onChange={v => setDespesaForm(f => ({ ...f, categoriaIma: v, subcategoriaIma: '' }))}
+                labelMap={Object.fromEntries(CATEGORIAS_IMA_DESPESA.map(c => [c.value, c.label]))}
+              />
+              {despesaForm.categoriaIma !== '' && (SUBCATEGORIAS_IMA[despesaForm.categoriaIma] ?? []).length > 0 && (
+                <>
+                  <Text style={styles.label}>Subcategoria IMA</Text>
+                  <ChipGroup
+                    options={SUBCATEGORIAS_IMA[despesaForm.categoriaIma] ?? []}
+                    value={despesaForm.subcategoriaIma}
+                    onChange={v => setDespesaForm(f => ({ ...f, subcategoriaIma: v }))}
+                  />
+                </>
+              )}
+              <Field label="Data de pagamento (opcional)" value={despesaForm.dataPagamento}
+                onChangeText={v => setDespesaForm(f => ({ ...f, dataPagamento: formatarDataBrasileira(v) }))}
+                keyboardType="number-pad" maxLength={10} placeholder="DD/MM/AAAA" />
               <Field label="Descrição (opcional)" value={despesaForm.descricao}
                 onChangeText={v => setDespesaForm(f => ({ ...f, descricao: v }))}
                 placeholder="Ex: Compra de ração" />
-              <Field label="Valor (R$)" value={despesaForm.valor}
+              <Field label="Valor (R$)" testID="input-valor-despesa" value={despesaForm.valor}
                 onChangeText={v => setDespesaForm(f => ({ ...f, valor: v }))}
                 keyboardType="decimal-pad" placeholder="0,00" />
               <Field label="Data" value={despesaForm.dataDespesa}
@@ -974,7 +999,7 @@ export default function FinanceiroScreen({ navigation }: Props) {
                 <TouchableOpacity style={styles.botaoCancelar} onPress={() => setModalDespesa(false)} disabled={salvando}>
                   <Text style={styles.botaoCancelarTexto}>Cancelar</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.botaoSalvar} onPress={salvarDespesa} disabled={salvando}>
+                <TouchableOpacity testID="btn-salvar-despesa" style={styles.botaoSalvar} onPress={salvarDespesa} disabled={salvando}>
                   {salvando ? <ActivityIndicator color="#fff" /> : <Text style={styles.botaoSalvarTexto}>Salvar</Text>}
                 </TouchableOpacity>
               </View>
@@ -998,7 +1023,7 @@ export default function FinanceiroScreen({ navigation }: Props) {
               <Field label="Descrição (opcional)" value={receitaForm.descricao}
                 onChangeText={v => setReceitaForm(f => ({ ...f, descricao: v }))}
                 placeholder="Ex: Venda de leite" />
-              <Field label="Valor (R$)" value={receitaForm.valor}
+              <Field label="Valor (R$)" testID="input-valor-receita" value={receitaForm.valor}
                 onChangeText={v => setReceitaForm(f => ({ ...f, valor: v }))}
                 keyboardType="decimal-pad" placeholder="0,00" />
               <Field label="Data" value={receitaForm.dataReceita}
@@ -1008,7 +1033,7 @@ export default function FinanceiroScreen({ navigation }: Props) {
                 <TouchableOpacity style={styles.botaoCancelar} onPress={() => setModalReceita(false)} disabled={salvando}>
                   <Text style={styles.botaoCancelarTexto}>Cancelar</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.botaoSalvar} onPress={salvarReceita} disabled={salvando}>
+                <TouchableOpacity testID="btn-salvar-receita" style={styles.botaoSalvar} onPress={salvarReceita} disabled={salvando}>
                   {salvando ? <ActivityIndicator color="#fff" /> : <Text style={styles.botaoSalvarTexto}>Salvar</Text>}
                 </TouchableOpacity>
               </View>
@@ -1062,7 +1087,7 @@ export default function FinanceiroScreen({ navigation }: Props) {
                 </View>
               ) : null}
 
-              <Field label="Valor da Venda (R$)" value={vendaAnimalForm.valor}
+              <Field label="Valor da Venda (R$)" testID="input-valor-venda" value={vendaAnimalForm.valor}
                 onChangeText={v => setVendaAnimalForm(f => ({ ...f, valor: v }))}
                 keyboardType="decimal-pad" placeholder="0,00" />
               <Field label="Data" value={vendaAnimalForm.data}
@@ -1078,7 +1103,7 @@ export default function FinanceiroScreen({ navigation }: Props) {
                 }} disabled={salvando}>
                   <Text style={styles.botaoCancelarTexto}>Cancelar</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.botaoSalvar} onPress={salvarVendaAnimal} disabled={salvando}>
+                <TouchableOpacity testID="btn-salvar-venda-animal" style={styles.botaoSalvar} onPress={salvarVendaAnimal} disabled={salvando}>
                   {salvando ? <ActivityIndicator color="#fff" /> : <Text style={styles.botaoSalvarTexto}>Salvar</Text>}
                 </TouchableOpacity>
               </View>
@@ -1096,7 +1121,7 @@ export default function FinanceiroScreen({ navigation }: Props) {
               <Field label="Nome do animal (opcional)" value={compraAnimalForm.nomeAnimal}
                 onChangeText={v => setCompraAnimalForm(f => ({ ...f, nomeAnimal: v }))}
                 placeholder="Ex: Bezerro Pinta" />
-              <Field label="Valor (R$)" value={compraAnimalForm.valor}
+              <Field label="Valor (R$)" testID="input-valor-compra" value={compraAnimalForm.valor}
                 onChangeText={v => setCompraAnimalForm(f => ({ ...f, valor: v }))}
                 keyboardType="decimal-pad" placeholder="0,00" />
               <Field label="Data" value={compraAnimalForm.data}
@@ -1106,7 +1131,7 @@ export default function FinanceiroScreen({ navigation }: Props) {
                 <TouchableOpacity style={styles.botaoCancelar} onPress={() => setModalCompraAnimal(false)} disabled={salvando}>
                   <Text style={styles.botaoCancelarTexto}>Cancelar</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.botaoSalvar} onPress={salvarCompraAnimal} disabled={salvando}>
+                <TouchableOpacity testID="btn-salvar-compra-animal" style={styles.botaoSalvar} onPress={salvarCompraAnimal} disabled={salvando}>
                   {salvando ? <ActivityIndicator color="#fff" /> : <Text style={styles.botaoSalvarTexto}>Salvar</Text>}
                 </TouchableOpacity>
               </View>
@@ -1133,7 +1158,7 @@ export default function FinanceiroScreen({ navigation }: Props) {
               <Field label="Quantidade (opcional)" value={insumosForm.quantidade}
                 onChangeText={v => setInsumosForm(f => ({ ...f, quantidade: v }))}
                 placeholder="Ex: 10 sacos" />
-              <Field label="Valor Total (R$)" value={insumosForm.valor}
+              <Field label="Valor Total (R$)" testID="input-valor-insumo" value={insumosForm.valor}
                 onChangeText={v => setInsumosForm(f => ({ ...f, valor: v }))}
                 keyboardType="decimal-pad" placeholder="0,00" />
               <Field label="Data" value={insumosForm.data}
@@ -1143,7 +1168,7 @@ export default function FinanceiroScreen({ navigation }: Props) {
                 <TouchableOpacity style={styles.botaoCancelar} onPress={() => setModalInsumos(false)} disabled={salvando}>
                   <Text style={styles.botaoCancelarTexto}>Cancelar</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.botaoSalvar} onPress={salvarInsumos} disabled={salvando}>
+                <TouchableOpacity testID="btn-salvar-insumo" style={styles.botaoSalvar} onPress={salvarInsumos} disabled={salvando}>
                   {salvando ? <ActivityIndicator color="#fff" /> : <Text style={styles.botaoSalvarTexto}>Salvar</Text>}
                 </TouchableOpacity>
               </View>
@@ -1168,7 +1193,7 @@ export default function FinanceiroScreen({ navigation }: Props) {
                 onChange={v => setFuncionarioForm(f => ({ ...f, tipo: v }))}
                 labelMap={{ Salario: 'Salário', Diaria: 'Diária', Servico: 'Serviço' }}
               />
-              <Field label="Valor (R$)" value={funcionarioForm.valor}
+              <Field label="Valor (R$)" testID="input-valor-funcionario" value={funcionarioForm.valor}
                 onChangeText={v => setFuncionarioForm(f => ({ ...f, valor: v }))}
                 keyboardType="decimal-pad" placeholder="0,00" />
               <Field label="Data" value={funcionarioForm.data}
@@ -1178,7 +1203,7 @@ export default function FinanceiroScreen({ navigation }: Props) {
                 <TouchableOpacity style={styles.botaoCancelar} onPress={() => setModalFuncionario(false)} disabled={salvando}>
                   <Text style={styles.botaoCancelarTexto}>Cancelar</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.botaoSalvar} onPress={salvarFuncionario} disabled={salvando}>
+                <TouchableOpacity testID="btn-salvar-funcionario" style={styles.botaoSalvar} onPress={salvarFuncionario} disabled={salvando}>
                   {salvando ? <ActivityIndicator color="#fff" /> : <Text style={styles.botaoSalvarTexto}>Salvar</Text>}
                 </TouchableOpacity>
               </View>

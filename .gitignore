@@ -44,3 +44,10 @@ yarn-error.*
 AgroControl.API/bin/
 AgroControl.API/obj/
 AgroControl.API/*.user
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/

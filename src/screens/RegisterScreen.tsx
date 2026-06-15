@@ -156,7 +156,7 @@ export default function RegisterScreen({ navigation }: Props) {
       <StatusBar style="light" />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}
       >
       <ScrollView
         contentContainerStyle={styles.scroll}
@@ -191,6 +191,7 @@ export default function RegisterScreen({ navigation }: Props) {
             <View style={[styles.inputBox, erros.nomeCompleto && styles.inputBoxErro]}>
               <Ionicons name="person-outline" size={18} color={PRIMARY} style={styles.inputIcone} />
               <TextInput
+                testID="input-reg-nome"
                 style={styles.input}
                 placeholder=""
                 placeholderTextColor="#bbb"
@@ -206,6 +207,7 @@ export default function RegisterScreen({ navigation }: Props) {
             <View style={[styles.inputBox, erros.email && styles.inputBoxErro]}>
               <Ionicons name="mail-outline" size={18} color={PRIMARY} style={styles.inputIcone} />
               <TextInput
+                testID="input-reg-email"
                 style={styles.input}
                 placeholder=""
                 placeholderTextColor="#bbb"
@@ -228,6 +230,7 @@ export default function RegisterScreen({ navigation }: Props) {
             <View style={[styles.inputBox, erros.nomeProp && styles.inputBoxErro]}>
               <Ionicons name="home-outline" size={18} color={PRIMARY} style={styles.inputIcone} />
               <TextInput
+                testID="input-reg-propriedade"
                 style={styles.input}
                 placeholder=""
                 placeholderTextColor="#bbb"
@@ -243,6 +246,7 @@ export default function RegisterScreen({ navigation }: Props) {
             <View style={[styles.inputBox, erros.cidade && styles.inputBoxErro]}>
               <Ionicons name="location-outline" size={18} color={PRIMARY} style={styles.inputIcone} />
               <TextInput
+                testID="input-reg-cidade"
                 style={styles.input}
                 placeholder=""
                 placeholderTextColor="#bbb"
@@ -256,6 +260,7 @@ export default function RegisterScreen({ navigation }: Props) {
           <View style={styles.campoWrapper}>
             <Text style={styles.label}>Estado <Text style={styles.obrigatorio}>*</Text></Text>
             <TouchableOpacity
+              testID="btn-estado"
               style={[styles.inputBox, erros.estado && styles.inputBoxErro]}
               onPress={() => setModalEstado(true)}
               activeOpacity={0.8}
@@ -281,6 +286,7 @@ export default function RegisterScreen({ navigation }: Props) {
             <View style={[styles.inputBox, erros.usuario && styles.inputBoxErro]}>
               <Ionicons name="person-outline" size={18} color={PRIMARY} style={styles.inputIcone} />
               <TextInput
+                testID="input-reg-usuario"
                 style={styles.input}
                 placeholder=""
                 placeholderTextColor="#bbb"
@@ -297,8 +303,9 @@ export default function RegisterScreen({ navigation }: Props) {
             <View style={[styles.inputBox, erros.senha && styles.inputBoxErro]}>
               <Ionicons name="lock-closed-outline" size={18} color={PRIMARY} style={styles.inputIcone} />
               <TextInput
+                testID="input-reg-senha"
                 style={styles.input}
-                placeholder=""
+                placeholder="Senha"
                 placeholderTextColor="#bbb"
                 secureTextEntry={!senhaVisivel}
                 value={senha}
@@ -323,8 +330,9 @@ export default function RegisterScreen({ navigation }: Props) {
             <View style={[styles.inputBox, erros.confirmarSenha && styles.inputBoxErro]}>
               <Ionicons name="lock-closed-outline" size={18} color={PRIMARY} style={styles.inputIcone} />
               <TextInput
+                testID="input-reg-confirma-senha"
                 style={styles.input}
-                placeholder=""
+                placeholder="Confirmar Senha"
                 placeholderTextColor="#bbb"
                 secureTextEntry={!confirmarSenhaVisivel}
                 value={confirmarSenha}
@@ -347,6 +355,7 @@ export default function RegisterScreen({ navigation }: Props) {
           {erroGeral ? <Text style={styles.erroGeral}>{erroGeral}</Text> : null}
 
           <TouchableOpacity
+            testID="btn-registrar"
             style={[styles.botao, carregando && styles.botaoDesabilitado]}
             onPress={handleCadastrar}
             activeOpacity={0.85}
@@ -357,7 +366,7 @@ export default function RegisterScreen({ navigation }: Props) {
             }
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.linkLogin} onPress={() => navigation.replace('Login')}>
+          <TouchableOpacity testID="btn-ja-tenho-conta" style={styles.linkLogin} onPress={() => navigation.replace('Login')}>
             <Text style={styles.linkLoginTexto}>Já tenho conta — Fazer Login</Text>
           </TouchableOpacity>
         </View>
@@ -377,6 +386,7 @@ export default function RegisterScreen({ navigation }: Props) {
               keyExtractor={item => item.sigla}
               renderItem={({ item }) => (
                 <TouchableOpacity
+                  testID={`opcao-estado-${item.sigla.toLowerCase()}`}
                   style={[styles.modalItem, item.sigla === estado && styles.modalItemSelecionado]}
                   onPress={() => {
                     setEstado(item.sigla);

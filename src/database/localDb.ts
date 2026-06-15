@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import { AnimalParams } from '../types/navigation';
+import { createFazendaTables, migrateDespesaLocal } from './fazendaSchema';
 
 // expo-sqlite has no web support; metro.config.js resolves it to an empty
 // module on web, and initDatabase() returns early so db stays null.
@@ -122,6 +123,9 @@ export async function initDatabase(): Promise<void> {
         atualizado_em TEXT NOT NULL
       );
     `);
+
+    await database.execAsync(createFazendaTables);
+    try { await database.execAsync(migrateDespesaLocal); } catch (_) {}
 
     db = database;
   } catch (error) {

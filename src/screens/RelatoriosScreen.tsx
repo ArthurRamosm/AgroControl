@@ -476,6 +476,7 @@ export default function RelatoriosScreen({ navigation }: Props) {
                 </View>
               </View>
               <TouchableOpacity
+                testID={`btn-relatorio-${card.tipo}`}
                 style={[styles.btnGerar, carregando === card.tipo && styles.btnGerarLoading]}
                 onPress={() => abrirModalPeriodo(card.tipo)}
                 disabled={carregando !== null}
@@ -524,6 +525,7 @@ export default function RelatoriosScreen({ navigation }: Props) {
 
               <Text style={styles.labelPeriodo}>Data Início</Text>
               <TextInput
+                testID="input-data-inicio"
                 style={styles.inputPeriodo}
                 value={dataInicio}
                 onChangeText={v => setDataInicio(formatarDataBrasileira(v))}
@@ -535,6 +537,7 @@ export default function RelatoriosScreen({ navigation }: Props) {
 
               <Text style={styles.labelPeriodo}>Data Fim</Text>
               <TextInput
+                testID="input-data-fim"
                 style={styles.inputPeriodo}
                 value={dataFim}
                 onChangeText={v => setDataFim(formatarDataBrasileira(v))}
@@ -551,7 +554,7 @@ export default function RelatoriosScreen({ navigation }: Props) {
                 >
                   <Text style={styles.botaoCancelarTexto}>Cancelar</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.botaoSalvar} onPress={confirmarGerar}>
+                <TouchableOpacity testID="btn-gerar-relatorio" style={styles.botaoSalvar} onPress={confirmarGerar}>
                   <MaterialCommunityIcons name="file-chart-outline" size={16} color="#fff" />
                   <Text style={styles.botaoSalvarTexto}>Gerar Relatório</Text>
                 </TouchableOpacity>
@@ -564,7 +567,7 @@ export default function RelatoriosScreen({ navigation }: Props) {
       {/* ── Modal de resultado do relatório ───────────────────────────────── */}
       <Modal visible={dadosAbertos !== null} transparent animationType="slide">
         <View style={styles.modalFundo}>
-          <View style={styles.modalCaixa}>
+          <View testID="resultado-relatorio" style={styles.modalCaixa}>
             <View style={styles.modalCabecalho}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.modalTitulo}>
@@ -588,6 +591,7 @@ export default function RelatoriosScreen({ navigation }: Props) {
 
             <View style={styles.modalRodape}>
               <TouchableOpacity
+                testID="btn-exportar-pdf"
                 style={styles.btnExportar}
                 onPress={exportarPdf}
                 disabled={exportando}

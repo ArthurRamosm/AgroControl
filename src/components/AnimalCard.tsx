@@ -53,6 +53,8 @@ export default function AnimalCard({ animal, onPress, onEdit, onDelete, afastado
     <TouchableOpacity
       style={[styles.card, !animal.ativo && styles.cardInativo]}
       activeOpacity={0.82}
+      accessibilityRole="button"
+      testID={`animal-card-${animal.id}`}
       onPress={() => onPress?.(animal)}
     >
       {/* Foto / imagem padrão 56×56 */}
@@ -95,10 +97,10 @@ export default function AnimalCard({ animal, onPress, onEdit, onDelete, afastado
       {/* Ações — apenas para animais ativos */}
       {animal.ativo && (
         <View style={styles.acoes}>
-          <TouchableOpacity style={styles.botaoEditar} onPress={e => handleAction(e, onEdit)}>
+          <TouchableOpacity testID="btn-editar-animal" style={styles.botaoEditar} onPress={e => handleAction(e, onEdit)}>
             <MaterialCommunityIcons name="pencil-outline" size={18} color="#1a3d1f" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.botaoExcluir} onPress={e => handleAction(e, onDelete)}>
+          <TouchableOpacity testID="btn-excluir-animal" style={styles.botaoExcluir} onPress={e => handleAction(e, onDelete)}>
             <MaterialCommunityIcons name="trash-can-outline" size={18} color="#c0392b" />
           </TouchableOpacity>
         </View>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -24,6 +24,11 @@ import BottomMenu from '../components/BottomMenu';
 import { dataBrParaApi, formatarDataBrasileira, idadeAnimal, validarDataCompleta } from '../utils/animalHealth';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { saveAnimalFichaCache, getAnimalFichaCache, addToSyncQueue } from '../database/localDb';
+import * as SQLite from 'expo-sqlite';
+import { Ionicons } from '@expo/vector-icons';
+import { gerarPdfFichaZootecnica } from '../utils/pdf/pdfFichaZootecnica';
+
+const dbLocal = Platform.OS !== 'web' ? SQLite.openDatabaseSync('agrocontrol.db') : null as any;
 
 const PRIMARY = '#1a3d1f';
 const EVENTOS = [
@@ -146,6 +151,41 @@ type SaudeRegistro = {
   observacao?: string | null;
 };
 
+type LactacaoLocal = {
+  id: number;
+  animal_id: number;
+  numero_parto: number;
+  data_parto?: string | null;
+  inicio_controle?: string | null;
+  data_secagem?: string | null;
+  dias_lactacao?: number | null;
+  producao_total_kg?: number | null;
+  media_kg_dia?: number | null;
+};
+
+type CoberturaLocal = {
+  id: number;
+  animal_id: number;
+  data_cobertura: string;
+  tipo?: string | null;
+  reprodutor?: string | null;
+  diagnostico_gestacao?: string | null;
+  data_diag?: string | null;
+  data_prevista_parto?: string | null;
+  data_real_parto?: string | null;
+};
+
+type CuraUmbigoLocal = {
+  id: number;
+  animal_id: number;
+  dia_1?: string | null;
+  dia_2?: string | null;
+  dia_3?: string | null;
+  dia_4?: string | null;
+  dia_5?: string | null;
+  observacoes?: string | null;
+};
+
 const eventoInicial: EventoForm = {
   tipoEvento: 'Pesagem',
   dataEvento: hoje(),
@@ -188,6 +228,35 @@ const vermifugacaoInicial: VermifugacaoForm = {
   dose: '',
   proximaAplicacao: '',
   observacao: '',
+};
+
+const lactacaoLocalInicial = {
+  numero_parto: '',
+  data_parto: '',
+  inicio_controle: '',
+  data_secagem: '',
+  dias_lactacao: '',
+  producao_total_kg: '',
+  media_kg_dia: '',
+};
+
+const coberturaLocalInicial = {
+  data_cobertura: '',
+  tipo: 'Monta Natural',
+  reprodutor: '',
+  diagnostico_gestacao: '',
+  data_diag: '',
+  data_prevista_parto: '',
+  data_real_parto: '',
+};
+
+const curaUmbigoInicial = {
+  dia_1: 'N' as 'S' | 'N',
+  dia_2: 'N' as 'S' | 'N',
+  dia_3: 'N' as 'S' | 'N',
+  dia_4: 'N' as 'S' | 'N',
+  dia_5: 'N' as 'S' | 'N',
+  observacoes: '',
 };
 
 function hojeBr() {
@@ -249,6 +318,15 @@ export default function AnimalDetailsScreen({ navigation, route }: Props) {
   const [reproducaoForm, setReproducaoForm] = useState<ReproducaoForm>(reproducaoInicial);
   const [vacinaForm, setVacinaForm] = useState<VacinaForm>(vacinaInicial);
   const [vermifugacaoForm, setVermifugacaoForm] = useState<VermifugacaoForm>(vermifugacaoInicial);
+  const [lactacoesLocal, setLactacoesLocal] = useState<LactacaoLocal[]>([]);
+  const [coberturasLocal, setCoberturasLocal] = useState<CoberturaLocal[]>([]);
+  const [curaUmbigoList, setCuraUmbigoList] = useState<CuraUmbigoLocal[]>([]);
+  const [lactacaoLocalModal, setLactacaoLocalModal] = useState(false);
+  const [coberturaLocalModal, setCoberturaLocalModal] = useState(false);
+  const [curaUmbigoModal, setCuraUmbigoModal] = useState(false);
+  const [lactacaoLocalForm, setLactacaoLocalForm] = useState(lactacaoLocalInicial);
+  const [coberturaLocalForm, setCoberturaLocalForm] = useState(coberturaLocalInicial);
+  const [curaUmbigoForm, setCuraUmbigoForm] = useState(curaUmbigoInicial);
 
   type FichaCache = {
     eventos: AnimalEvento[];
@@ -307,6 +385,43 @@ export default function AnimalDetailsScreen({ navigation, route }: Props) {
   useEffect(() => {
     carregarFicha();
   }, [animal.id, propriedadeId]);
+
+  const carregarLactacoesLocal = useCallback(() => {
+    if (!dbLocal) return;
+    try {
+      const rows = dbLocal.getAllSync<LactacaoLocal>(
+        'SELECT * FROM animal_lactacao WHERE animal_id = ? ORDER BY numero_parto DESC',
+        [animal.id]
+      );
+      setLactacoesLocal(rows);
+    } catch {}
+  }, [animal.id]);
+
+  const carregarCoberturasLocal = useCallback(() => {
+    if (!dbLocal) return;
+    try {
+      const rows = dbLocal.getAllSync<CoberturaLocal>(
+        'SELECT * FROM animal_cobertura WHERE animal_id = ? ORDER BY data_cobertura DESC',
+        [animal.id]
+      );
+      setCoberturasLocal(rows);
+    } catch {}
+  }, [animal.id]);
+
+  const carregarCuraUmbigo = useCallback(() => {
+    if (!dbLocal) return;
+    try {
+      const rows = dbLocal.getAllSync<CuraUmbigoLocal>(
+        'SELECT * FROM animal_cura_umbigo WHERE animal_id = ? ORDER BY created_at DESC',
+        [animal.id]
+      );
+      setCuraUmbigoList(rows);
+    } catch {}
+  }, [animal.id]);
+
+  useEffect(() => { carregarLactacoesLocal(); }, [carregarLactacoesLocal]);
+  useEffect(() => { carregarCoberturasLocal(); }, [carregarCoberturasLocal]);
+  useEffect(() => { carregarCuraUmbigo(); }, [carregarCuraUmbigo]);
 
   async function salvarEvento() {
     const pesoKg = numeroOuNull(eventoForm.pesoKg);
@@ -560,6 +675,105 @@ export default function AnimalDetailsScreen({ navigation, route }: Props) {
     }
   }
 
+  function salvarLactacaoLocal() {
+    if (!dbLocal) return;
+    if (!lactacaoLocalForm.numero_parto.trim()) {
+      Alert.alert('Atencao', 'Informe o numero do parto.');
+      return;
+    }
+    try {
+      dbLocal.runSync(
+        `INSERT INTO animal_lactacao (animal_id, numero_parto, data_parto, inicio_controle, data_secagem, dias_lactacao, producao_total_kg, media_kg_dia, sync_status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+        [
+          animal.id,
+          Number(lactacaoLocalForm.numero_parto) || 0,
+          lactacaoLocalForm.data_parto.trim() || null,
+          lactacaoLocalForm.inicio_controle.trim() || null,
+          lactacaoLocalForm.data_secagem.trim() || null,
+          lactacaoLocalForm.dias_lactacao.trim() ? Number(lactacaoLocalForm.dias_lactacao) : null,
+          lactacaoLocalForm.producao_total_kg.trim() ? Number(lactacaoLocalForm.producao_total_kg.replace(',', '.')) : null,
+          lactacaoLocalForm.media_kg_dia.trim() ? Number(lactacaoLocalForm.media_kg_dia.replace(',', '.')) : null,
+        ]
+      );
+      setLactacaoLocalModal(false);
+      setLactacaoLocalForm(lactacaoLocalInicial);
+      carregarLactacoesLocal();
+    } catch {
+      Alert.alert('Erro', 'Nao foi possivel salvar a lactacao.');
+    }
+  }
+
+  function salvarCoberturaLocal() {
+    if (!dbLocal) return;
+    if (!coberturaLocalForm.data_cobertura.trim()) {
+      Alert.alert('Atencao', 'Informe a data da cobertura.');
+      return;
+    }
+    if (!validarDataCompleta(coberturaLocalForm.data_cobertura)) {
+      Alert.alert('Atencao', 'Informe a data em DD/MM/AAAA.');
+      return;
+    }
+    try {
+      dbLocal.runSync(
+        `INSERT INTO animal_cobertura (animal_id, data_cobertura, tipo, reprodutor, diagnostico_gestacao, data_diag, data_prevista_parto, data_real_parto, sync_status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+        [
+          animal.id,
+          dataBrParaApi(coberturaLocalForm.data_cobertura),
+          coberturaLocalForm.tipo.trim() || null,
+          coberturaLocalForm.reprodutor.trim() || null,
+          coberturaLocalForm.diagnostico_gestacao.trim() || null,
+          coberturaLocalForm.data_diag.trim() ? dataBrParaApi(coberturaLocalForm.data_diag) : null,
+          coberturaLocalForm.data_prevista_parto.trim() ? dataBrParaApi(coberturaLocalForm.data_prevista_parto) : null,
+          coberturaLocalForm.data_real_parto.trim() ? dataBrParaApi(coberturaLocalForm.data_real_parto) : null,
+        ]
+      );
+      setCoberturaLocalModal(false);
+      setCoberturaLocalForm(coberturaLocalInicial);
+      carregarCoberturasLocal();
+    } catch {
+      Alert.alert('Erro', 'Nao foi possivel salvar a cobertura.');
+    }
+  }
+
+  function salvarCuraUmbigo() {
+    if (!dbLocal) return;
+    try {
+      dbLocal.runSync(
+        `INSERT INTO animal_cura_umbigo (animal_id, dia_1, dia_2, dia_3, dia_4, dia_5, observacoes, sync_status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
+        [
+          animal.id,
+          curaUmbigoForm.dia_1,
+          curaUmbigoForm.dia_2,
+          curaUmbigoForm.dia_3,
+          curaUmbigoForm.dia_4,
+          curaUmbigoForm.dia_5,
+          curaUmbigoForm.observacoes.trim() || null,
+        ]
+      );
+      setCuraUmbigoModal(false);
+      setCuraUmbigoForm(curaUmbigoInicial);
+      carregarCuraUmbigo();
+    } catch {
+      Alert.alert('Erro', 'Nao foi possivel salvar a cura do umbigo.');
+    }
+  }
+
+  const handleGerarFicha = async () => {
+    try {
+      await gerarPdfFichaZootecnica(animal.id, 1);
+    } catch (e) {
+      Alert.alert('Erro', 'Não foi possível gerar a ficha.');
+    }
+  };
+
+  const diasDeVida = animal.dataNascimento
+    ? Math.floor((Date.now() - new Date(animal.dataNascimento).getTime()) / (1000 * 60 * 60 * 24))
+    : 999;
+  const ehBezerroRecemNascido = diasDeVida < 30;
+
   const fotoPrincipal = animal.fotos?.[0]?.fotoBase64;
   const fotoUri = fotoPrincipal ? `data:image/jpeg;base64,${fotoPrincipal}` : null;
 
@@ -568,9 +782,15 @@ export default function AnimalDetailsScreen({ navigation, route }: Props) {
       <StatusBar style="light" />
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: 126 + insets.bottom }]}>
         <View style={styles.cabecalho}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.voltar}>
-            <Text style={styles.voltarTexto}>{'\u2190'} Voltar</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.voltar}>
+              <Text style={styles.voltarTexto}>{'\u2190'} Voltar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity testID="btn-pdf-ficha" onPress={handleGerarFicha} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="document-text-outline" size={20} color="#fff" />
+              <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>Gerar Relatório PDF</Text>
+            </TouchableOpacity>
+          </View>
           <Text style={styles.titulo}>Ficha do Animal</Text>
           <Text style={styles.subtitulo}>{animal.nome || animal.brinco || 'Animal'}</Text>
         </View>
@@ -616,6 +836,7 @@ export default function AnimalDetailsScreen({ navigation, route }: Props) {
           title="Saude"
           action="Registrar vacina"
           onAction={() => setVacinaModal(true)}
+          actionTestID="btn-registrar-vacina"
         >
           <TouchableOpacity style={styles.botaoLinha} onPress={() => setVermifugacaoModal(true)}>
             <Text style={styles.botaoLinhaTexto}>Registrar vermifugacao</Text>
@@ -698,6 +919,59 @@ export default function AnimalDetailsScreen({ navigation, route }: Props) {
             </View>
           ))}
         </Section>
+
+        <Section title="Lactacoes (Local)" action="+ Adicionar" onAction={() => setLactacaoLocalModal(true)}>
+          {lactacoesLocal.length === 0 ? (
+            <Text style={styles.vazio}>Nenhuma lactacao local registrada.</Text>
+          ) : lactacoesLocal.map(lac => (
+            <View key={lac.id} style={styles.item}>
+              <Text style={styles.itemTitulo}>Parto {lac.numero_parto}</Text>
+              <Info label="Data do parto" value={data(lac.data_parto)} compact />
+              <Info label="Inicio controle" value={data(lac.inicio_controle)} compact />
+              <Info label="Data de secagem" value={data(lac.data_secagem)} compact />
+              <Info label="Dias de lactacao" value={lac.dias_lactacao} compact />
+              <Info label="Producao total" value={lac.producao_total_kg != null ? `${lac.producao_total_kg} kg` : null} compact />
+              <Info label="Media kg/dia" value={lac.media_kg_dia != null ? `${lac.media_kg_dia} kg/dia` : null} compact />
+            </View>
+          ))}
+        </Section>
+
+        <Section title="Coberturas / Inseminacoes" action="+ Adicionar" onAction={() => setCoberturaLocalModal(true)}>
+          {coberturasLocal.length === 0 ? (
+            <Text style={styles.vazio}>Nenhuma cobertura registrada.</Text>
+          ) : coberturasLocal.map(cob => (
+            <View key={cob.id} style={styles.item}>
+              <Text style={styles.itemTitulo}>{cob.tipo || 'Cobertura'}</Text>
+              <Info label="Data" value={data(cob.data_cobertura)} compact />
+              <Info label="Reprodutor" value={cob.reprodutor} compact />
+              <Info label="Diagnostico" value={cob.diagnostico_gestacao} compact />
+              <Info label="Data do diag." value={data(cob.data_diag)} compact />
+              <Info label="Prev. parto" value={data(cob.data_prevista_parto)} compact />
+              <Info label="Parto real" value={data(cob.data_real_parto)} compact />
+            </View>
+          ))}
+        </Section>
+
+        {ehBezerroRecemNascido && (
+          <Section title="Cura do Umbigo" action="+ Registrar" onAction={() => setCuraUmbigoModal(true)}>
+            {curaUmbigoList.length === 0 ? (
+              <Text style={styles.vazio}>Nenhum registro de cura do umbigo.</Text>
+            ) : curaUmbigoList.map(cur => (
+              <View key={cur.id} style={styles.item}>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 6 }}>
+                  {(['dia_1', 'dia_2', 'dia_3', 'dia_4', 'dia_5'] as const).map((d, i) => (
+                    <View key={d} style={[styles.diaChip, { backgroundColor: cur[d] === 'S' ? '#d4edda' : '#f8d7da' }]}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: cur[d] === 'S' ? '#155724' : '#721c24' }}>
+                        Dia {i + 1}: {cur[d] === 'S' ? 'SIM' : 'NAO'}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+                {cur.observacoes ? <Info label="Observacoes" value={cur.observacoes} compact /> : null}
+              </View>
+            ))}
+          </Section>
+        )}
       </ScrollView>
 
       <EventoModal
@@ -745,6 +1019,80 @@ export default function AnimalDetailsScreen({ navigation, route }: Props) {
         onSave={salvarVermifugacao}
       />
 
+      <Modal visible={lactacaoLocalModal} transparent animationType="slide">
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <View style={styles.modalFundo}>
+            <ScrollView style={styles.modalCaixa} contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
+              <Text style={styles.modalTitulo}>Registrar Lactacao</Text>
+              <Field label="Numero do parto" value={lactacaoLocalForm.numero_parto} onChangeText={v => setLactacaoLocalForm(f => ({ ...f, numero_parto: v }))} keyboardType="number-pad" />
+              <Field label="Data do parto" value={lactacaoLocalForm.data_parto} onChangeText={v => setLactacaoLocalForm(f => ({ ...f, data_parto: v }))} placeholder="AAAA-MM-DD" />
+              <Field label="Inicio do controle" value={lactacaoLocalForm.inicio_controle} onChangeText={v => setLactacaoLocalForm(f => ({ ...f, inicio_controle: v }))} placeholder="AAAA-MM-DD" />
+              <Field label="Data de secagem" value={lactacaoLocalForm.data_secagem} onChangeText={v => setLactacaoLocalForm(f => ({ ...f, data_secagem: v }))} placeholder="AAAA-MM-DD" />
+              <Field label="Dias de lactacao" value={lactacaoLocalForm.dias_lactacao} onChangeText={v => setLactacaoLocalForm(f => ({ ...f, dias_lactacao: v }))} keyboardType="number-pad" />
+              <Field label="Producao total (kg)" value={lactacaoLocalForm.producao_total_kg} onChangeText={v => setLactacaoLocalForm(f => ({ ...f, producao_total_kg: v }))} keyboardType="decimal-pad" />
+              <Field label="Media kg/dia" value={lactacaoLocalForm.media_kg_dia} onChangeText={v => setLactacaoLocalForm(f => ({ ...f, media_kg_dia: v }))} keyboardType="decimal-pad" />
+              <ModalActions saving={salvando} onClose={() => setLactacaoLocalModal(false)} onSave={salvarLactacaoLocal} />
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      <Modal visible={coberturaLocalModal} transparent animationType="slide">
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <View style={styles.modalFundo}>
+            <ScrollView style={styles.modalCaixa} contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
+              <Text style={styles.modalTitulo}>Registrar Cobertura / IA</Text>
+              <Text style={styles.label}>Tipo</Text>
+              <View style={styles.chips}>
+                {['Monta Natural', 'IA'].map(t => (
+                  <TouchableOpacity key={t} style={[styles.chip, coberturaLocalForm.tipo === t && styles.chipAtivo]} onPress={() => setCoberturaLocalForm(f => ({ ...f, tipo: t }))}>
+                    <Text style={[styles.chipTexto, coberturaLocalForm.tipo === t && styles.chipTextoAtivo]}>{t}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <Field label="Data da cobertura" value={coberturaLocalForm.data_cobertura} onChangeText={v => setCoberturaLocalForm(f => ({ ...f, data_cobertura: formatarDataBrasileira(v) }))} placeholder="DD/MM/AAAA" keyboardType="number-pad" maxLength={10} />
+              <Field label="Reprodutor / Touro" value={coberturaLocalForm.reprodutor} onChangeText={v => setCoberturaLocalForm(f => ({ ...f, reprodutor: v }))} />
+              <Text style={styles.label}>Diagnostico de gestacao</Text>
+              <View style={styles.chips}>
+                {['+', '-', ''].map(d => (
+                  <TouchableOpacity key={d || 'nd'} style={[styles.chip, coberturaLocalForm.diagnostico_gestacao === d && styles.chipAtivo]} onPress={() => setCoberturaLocalForm(f => ({ ...f, diagnostico_gestacao: d }))}>
+                    <Text style={[styles.chipTexto, coberturaLocalForm.diagnostico_gestacao === d && styles.chipTextoAtivo]}>{d === '+' ? 'Positivo' : d === '-' ? 'Negativo' : 'Nao avaliado'}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <Field label="Data do diagnostico" value={coberturaLocalForm.data_diag} onChangeText={v => setCoberturaLocalForm(f => ({ ...f, data_diag: formatarDataBrasileira(v) }))} placeholder="DD/MM/AAAA" keyboardType="number-pad" maxLength={10} />
+              <Field label="Previsao de parto" value={coberturaLocalForm.data_prevista_parto} onChangeText={v => setCoberturaLocalForm(f => ({ ...f, data_prevista_parto: formatarDataBrasileira(v) }))} placeholder="DD/MM/AAAA" keyboardType="number-pad" maxLength={10} />
+              <Field label="Data do parto real" value={coberturaLocalForm.data_real_parto} onChangeText={v => setCoberturaLocalForm(f => ({ ...f, data_real_parto: formatarDataBrasileira(v) }))} placeholder="DD/MM/AAAA" keyboardType="number-pad" maxLength={10} />
+              <ModalActions saving={salvando} onClose={() => setCoberturaLocalModal(false)} onSave={salvarCoberturaLocal} />
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      <Modal visible={curaUmbigoModal} transparent animationType="slide">
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <View style={styles.modalFundo}>
+            <ScrollView style={styles.modalCaixa} contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
+              <Text style={styles.modalTitulo}>Cura do Umbigo</Text>
+              {(['dia_1', 'dia_2', 'dia_3', 'dia_4', 'dia_5'] as const).map((d, i) => (
+                <View key={d} style={{ marginBottom: 10 }}>
+                  <Text style={styles.label}>Dia {i + 1}</Text>
+                  <View style={styles.chips}>
+                    {(['S', 'N'] as const).map(v => (
+                      <TouchableOpacity key={v} style={[styles.chip, curaUmbigoForm[d] === v && styles.chipAtivo]} onPress={() => setCuraUmbigoForm(f => ({ ...f, [d]: v }))}>
+                        <Text style={[styles.chipTexto, curaUmbigoForm[d] === v && styles.chipTextoAtivo]}>{v === 'S' ? 'SIM' : 'NAO'}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              ))}
+              <Field label="Observacoes" value={curaUmbigoForm.observacoes} onChangeText={v => setCuraUmbigoForm(f => ({ ...f, observacoes: v }))} multiline />
+              <ModalActions saving={salvando} onClose={() => setCuraUmbigoModal(false)} onSave={salvarCuraUmbigo} />
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
       <BottomMenu activeItem="Animais" navigation={navigation} />
     </SafeAreaView>
   );
@@ -755,18 +1103,20 @@ function Section({
   children,
   action,
   onAction,
+  actionTestID,
 }: {
   title: string;
   children: React.ReactNode;
   action?: string;
   onAction?: () => void;
+  actionTestID?: string;
 }) {
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>{title}</Text>
         {action && (
-          <TouchableOpacity style={styles.addButton} onPress={onAction}>
+          <TouchableOpacity testID={actionTestID} style={styles.addButton} onPress={onAction}>
             <Text style={styles.addButtonText}>{action}</Text>
           </TouchableOpacity>
         )}
@@ -793,6 +1143,7 @@ function Field({
   keyboardType,
   maxLength,
   multiline,
+  testID,
 }: {
   label: string;
   value: string;
@@ -801,6 +1152,7 @@ function Field({
   keyboardType?: 'default' | 'decimal-pad' | 'number-pad';
   maxLength?: number;
   multiline?: boolean;
+  testID?: string;
 }) {
   return (
     <>
@@ -815,6 +1167,7 @@ function Field({
         maxLength={maxLength}
         multiline={multiline}
         textAlignVertical={multiline ? 'top' : 'center'}
+        testID={testID}
       />
     </>
   );
@@ -984,7 +1337,7 @@ function VacinaModal({
       <View style={styles.modalFundo}>
         <ScrollView style={styles.modalCaixa} contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
           <Text style={styles.modalTitulo}>Registrar vacina</Text>
-          <Field label="Nome da vacina" value={form.nomeVacina} onChangeText={(v) => onChange({ ...form, nomeVacina: v })} />
+          <Field label="Nome da vacina" value={form.nomeVacina} onChangeText={(v) => onChange({ ...form, nomeVacina: v })} testID="input-nome-vacina" />
           <Field
             label="Data de aplicacao"
             value={form.dataAplicacao}
@@ -992,10 +1345,11 @@ function VacinaModal({
             placeholder="DD/MM/AAAA"
             keyboardType="number-pad"
             maxLength={10}
+            testID="input-data-vacina"
           />
           <Field label="Dose" value={form.dose} onChangeText={(v) => onChange({ ...form, dose: v })} placeholder="Ex: 1 dose" />
           <Field label="Observacao" value={form.observacao} onChangeText={(v) => onChange({ ...form, observacao: v })} multiline />
-          <ModalActions saving={saving} onClose={onClose} onSave={onSave} />
+          <ModalActions saving={saving} onClose={onClose} onSave={onSave} saveTestID="btn-salvar-vacina" />
         </ScrollView>
       </View>
       </KeyboardAvoidingView>
@@ -1031,8 +1385,9 @@ function VermifugacaoModal({
             placeholder="DD/MM/AAAA"
             keyboardType="number-pad"
             maxLength={10}
+            testID="input-data-vermifugacao"
           />
-          <Field label="Produto utilizado" value={form.produtoUtilizado} onChangeText={(v) => onChange({ ...form, produtoUtilizado: v })} />
+          <Field label="Produto utilizado" value={form.produtoUtilizado} onChangeText={(v) => onChange({ ...form, produtoUtilizado: v })} testID="input-nome-vermifugo" />
           <Field label="Dose" value={form.dose} onChangeText={(v) => onChange({ ...form, dose: v })} />
           <Field
             label="Proxima aplicacao"
@@ -1043,7 +1398,7 @@ function VermifugacaoModal({
             maxLength={10}
           />
           <Field label="Observacao" value={form.observacao} onChangeText={(v) => onChange({ ...form, observacao: v })} multiline />
-          <ModalActions saving={saving} onClose={onClose} onSave={onSave} />
+          <ModalActions saving={saving} onClose={onClose} onSave={onSave} saveTestID="btn-salvar-vermifugacao" />
         </ScrollView>
       </View>
       </KeyboardAvoidingView>
@@ -1051,13 +1406,13 @@ function VermifugacaoModal({
   );
 }
 
-function ModalActions({ saving, onClose, onSave }: { saving: boolean; onClose: () => void; onSave: () => void }) {
+function ModalActions({ saving, onClose, onSave, saveTestID }: { saving: boolean; onClose: () => void; onSave: () => void; saveTestID?: string }) {
   return (
     <View style={styles.modalBotoes}>
       <TouchableOpacity style={styles.botaoCancelar} onPress={onClose} disabled={saving}>
         <Text style={styles.botaoCancelarTexto}>Cancelar</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.botaoSalvar} onPress={onSave} disabled={saving}>
+      <TouchableOpacity testID={saveTestID} style={styles.botaoSalvar} onPress={onSave} disabled={saving}>
         {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.botaoSalvarTexto}>Salvar</Text>}
       </TouchableOpacity>
     </View>
@@ -1136,6 +1491,7 @@ const styles = StyleSheet.create({
   },
   botaoLinhaTexto: { color: PRIMARY, fontSize: 13, fontWeight: '800' },
   vazio: { color: '#8a958e', fontSize: 14, paddingVertical: 10, textAlign: 'center' },
+  diaChip: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
   modalFundo: {
     backgroundColor: 'rgba(0,0,0,0.48)',
     flex: 1,

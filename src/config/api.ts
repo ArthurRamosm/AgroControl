@@ -1,4 +1,4 @@
-const DEV_URL = 'http://192.168.1.2:5249';
+const DEV_URL = 'http://localhost:5249';
 const PROD_URL = 'https://unenvied-snowfall-undrafted.ngrok-free.dev';
 
 export const API_URL = __DEV__ ? DEV_URL : PROD_URL;

@@ -21,6 +21,22 @@ import RelatoriosScreen from '../screens/RelatoriosScreen';
 import AfastamentoScreen from '../screens/AfastamentoScreen';
 import ConfiguracoesScreen from '../screens/ConfiguracoesScreen';
 import EstoqueScreen from '../screens/EstoqueScreen';
+import FazendaScreen from '../screens/FazendaScreen';
+import ProducaoDiariaScreen from '../screens/queijaria/ProducaoDiariaScreen';
+import PotabilidadeScreen from '../screens/queijaria/PotabilidadeScreen';
+import HigieneCaixaScreen from '../screens/queijaria/HigieneCaixaScreen';
+import AnaliseLabScreen from '../screens/queijaria/AnaliseLabScreen';
+import RastreabilidadeScreen from '../screens/queijaria/RastreabilidadeScreen';
+import HigienizacaoEquipScreen from '../screens/queijaria/HigienizacaoEquipScreen';
+import CondicoesVestiarioScreen from '../screens/queijaria/CondicoesVestiarioScreen';
+import DepositoLimpezaScreen from '../screens/queijaria/DepositoLimpezaScreen';
+import ControleLeiteiroScreen from '../screens/queijaria/ControleLeiteiroScreen';
+import VendaQueijoScreen from '../screens/queijaria/VendaQueijoScreen';
+import MastiteClinicaScreen from '../screens/saude/MastiteClinicaScreen';
+import MastiteSubclinicaScreen from '../screens/saude/MastiteSubclinicaScreen';
+import ParasitasScreen from '../screens/saude/ParasitasScreen';
+import DespesaDetalheScreen from '../screens/financeiro/DespesaDetalheScreen';
+import ReceitaDetalheScreen from '../screens/financeiro/ReceitaDetalheScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -67,6 +83,22 @@ export default function AppNavigator() {
           <Stack.Screen name="Afastamento" component={AfastamentoScreen} />
           <Stack.Screen name="Configuracoes" component={ConfiguracoesScreen} />
           <Stack.Screen name="Estoque" component={EstoqueScreen} />
+          <Stack.Screen name="FazendaScreen" component={FazendaScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="ProducaoDiaria" component={ProducaoDiariaScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="Potabilidade" component={PotabilidadeScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="HigieneCaixa" component={HigieneCaixaScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="AnaliseLabScreen" component={AnaliseLabScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="Rastreabilidade" component={RastreabilidadeScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="HigienizacaoEquip" component={HigienizacaoEquipScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="CondicoesVestiario" component={CondicoesVestiarioScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="DepositoLimpeza" component={DepositoLimpezaScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="ControleLeiteiro" component={ControleLeiteiroScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="VendaQueijo" component={VendaQueijoScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="MastiteClinica" component={MastiteClinicaScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="MastiteSubclinica" component={MastiteSubclinicaScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="Parasitas" component={ParasitasScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="DespesaDetalhe" component={DespesaDetalheScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="ReceitaDetalhe" component={ReceitaDetalheScreen} options={{ headerShown: false }} />
         </Stack.Navigator>
       </NavigationContainer>
     </View>

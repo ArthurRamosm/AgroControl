@@ -463,7 +463,7 @@ export default function AfastamentoScreen({ navigation }: Props) {
 
       {/* Botão fixo no rodapé */}
       <View style={styles.rodape}>
-        <TouchableOpacity style={styles.btnRegistrar} onPress={abrirNovo}>
+        <TouchableOpacity testID="btn-registrar-afastamento" style={styles.btnRegistrar} onPress={abrirNovo}>
           <Ionicons name="add-circle-outline" size={18} color="#fff" />
           <Text {...noTranslateProps} style={styles.btnRegistrarTexto}>Registrar Afastamento</Text>
         </TouchableOpacity>
@@ -481,6 +481,7 @@ export default function AfastamentoScreen({ navigation }: Props) {
             {/* Seleção de animal */}
             <Text style={styles.label}>Animal</Text>
             <TextInput
+              testID="input-busca-animal-afastamento"
               style={styles.input}
               value={buscaAnimal}
               onChangeText={setBuscaAnimal}
@@ -520,6 +521,7 @@ export default function AfastamentoScreen({ navigation }: Props) {
               {MOTIVOS.map(m => (
                 <TouchableOpacity
                   key={m}
+                  testID={`chip-motivo-${m.toLowerCase().replace(/ /g, '-')}`}
                   style={[styles.chip, form.motivoAfastamento === m && styles.chipAtivo]}
                   onPress={() => setForm(f => ({ ...f, motivoAfastamento: m }))}
                 >
@@ -537,12 +539,14 @@ export default function AfastamentoScreen({ navigation }: Props) {
               keyboardType="number-pad"
               maxLength={10}
               placeholder="DD/MM/AAAA"
+              testID="input-data-afastamento"
             />
             <Field
               label="Produto Utilizado (opcional)"
               value={form.produtoUtilizado}
               onChangeText={v => setForm(f => ({ ...f, produtoUtilizado: v }))}
               placeholder="Ex: Penicilina"
+              testID="input-produto-afastamento"
             />
             <Field
               label="Período de Carência (dias, opcional)"
@@ -553,6 +557,7 @@ export default function AfastamentoScreen({ navigation }: Props) {
               }}
               keyboardType="number-pad"
               placeholder="Ex: 7"
+              testID="input-periodo-carencia"
             />
             <Field
               label="Data de Retorno (opcional)"
@@ -561,6 +566,7 @@ export default function AfastamentoScreen({ navigation }: Props) {
               keyboardType="number-pad"
               maxLength={10}
               placeholder="DD/MM/AAAA (auto calculado)"
+              testID="input-data-retorno"
             />
             <Field
               label="Observação (opcional)"
@@ -568,6 +574,7 @@ export default function AfastamentoScreen({ navigation }: Props) {
               onChangeText={v => setForm(f => ({ ...f, observacao: v }))}
               multiline
               placeholder="Anotações adicionais..."
+              testID="input-observacao-afastamento"
             />
 
             <View style={styles.modalBotoes}>
@@ -578,7 +585,7 @@ export default function AfastamentoScreen({ navigation }: Props) {
               >
                 <Text style={styles.botaoCancelarTexto}>Cancelar</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.botaoSalvar} onPress={salvar} disabled={salvando}>
+              <TouchableOpacity testID="btn-salvar-afastamento" style={styles.botaoSalvar} onPress={salvar} disabled={salvando}>
                 {salvando ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
