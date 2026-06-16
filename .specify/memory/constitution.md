@@ -1,22 +1,19 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 1.1.0 → 1.2.0
-Rationale: MINOR bump — added Estoque to Backend Architecture (omitted in v1.1.0),
-added 16 new screens to Frontend API Integration Status (EstoqueScreen, FazendaScreen,
-3 Saúde sub-screens, 2 Financeiro sub-screens, 10 Queijaria screens), added Queijaria
-as a new operational domain pending backend integration, added fazendaSchema.ts to
-Technology & Platform Standards, updated Principle IV to name Queijaria as the new
-pending domain alongside the original three.
+Version change: 1.2.0 → 1.2.1
+Rationale: PATCH bump — factual status update for FinanceiroScreen,
+RelatoriosScreen, and MapaPropriedadeScreen to reflect that API integration
+implementation is complete (branch 001-api-telas-pendentes, tasks T005–T018 ✅);
+only final manual smoke tests (T009, T013, T019) and overall validation
+(T020–T021) remain before these screens are fully cleared.
 
 Modified principles:
-  - IV. API-First Data Flow: added Queijaria domain to pending integration list
+  - IV. API-First Data Flow: updated status description for the 3 non-Queijaria
+    pending screens from "in progress / needs migration" to "implementation
+    complete, smoke test pending"
 
-Added content:
-  - Technology & Platform Standards: fazendaSchema.ts note
-  - Backend Architecture / API Controllers: Estoque row
-  - Backend Architecture / Frontend API Integration Status: 16 new screen rows
-  - Backend Architecture: new "Queijaria Domain" subsection explaining local-only state
+Added content: none
 
 Removed sections: none
 
@@ -78,17 +75,22 @@ local cache; reads from SQLite are acceptable offline but MUST be invalidated
 and refreshed on next sync. New screens MUST NOT use json-server or static
 fixtures in production code — only the .NET Core backend.
 
-The screens still pending full API integration are:
+The screens still pending final validation:
 
-- **FinanceiroScreen** — endpoint verification and correction in progress
-- **RelatoriosScreen** — offline fallback completeness to be confirmed
-- **MapaPropriedadeScreen** — needs migration from AsyncStorage to SQLite + sync queue
+- **FinanceiroScreen** — implementation complete (branch `001-api-telas-pendentes`,
+  T005–T008 ✅); final manual smoke test (T009) pending
+- **RelatoriosScreen** — implementation complete (branch `001-api-telas-pendentes`,
+  T010–T012 ✅); final manual smoke test (T013) pending
+- **MapaPropriedadeScreen** — migration to SQLite + useNetworkStatus complete
+  (branch `001-api-telas-pendentes`, T014–T018 ✅); final manual smoke test
+  (T019) pending
 - **Queijaria domain** (10 screens) — backend controllers do not yet exist; screens
   operate in local-only mode (SQLite via `fazendaSchema.ts`) until the Queijaria
   backend is implemented
 
-These screens MUST be connected to their respective backend controllers before
-new features are layered on top of them.
+The first three screens MUST pass their smoke tests before new features are
+layered on top of them. The Queijaria screens MUST be connected to backend
+controllers once those are implemented.
 
 ### V. Data Integrity
 
@@ -183,9 +185,9 @@ iOS, and Web. All new backend dependencies MUST target .NET Core LTS.
 | FazendaScreen | ✅ (hub/navigation — no direct API calls) |
 | DespesaDetalheScreen | ✅ Financeiro |
 | ReceitaDetalheScreen | ✅ Financeiro |
-| **FinanceiroScreen** | ⚠️ **PENDING — endpoint verification/correction in progress** |
-| **RelatoriosScreen** | ⚠️ **PENDING — offline fallback completeness to be confirmed** |
-| **MapaPropriedadeScreen** | ⚠️ **PENDING — must migrate to SQLite + useNetworkStatus** |
+| **FinanceiroScreen** | 🔄 **IMPL DONE — smoke test pending (T009)** |
+| **RelatoriosScreen** | 🔄 **IMPL DONE — smoke test pending (T013)** |
+| **MapaPropriedadeScreen** | 🔄 **IMPL DONE — smoke test pending (T019)** |
 | **ProducaoDiariaScreen** | ⚠️ **PENDING — no Queijaria backend controller yet** |
 | **PotabilidadeScreen** | ⚠️ **PENDING — no Queijaria backend controller yet** |
 | **HigieneCaixaScreen** | ⚠️ **PENDING — no Queijaria backend controller yet** |
@@ -197,8 +199,10 @@ iOS, and Web. All new backend dependencies MUST target .NET Core LTS.
 | **ControleLeiteiroScreen** | ⚠️ **PENDING — no Queijaria backend controller yet** |
 | **VendaQueijoScreen** | ⚠️ **PENDING — no Queijaria backend controller yet** |
 
-Screens marked ⚠️ MUST be API-integrated before new features are layered on
-top of them (see Principle IV).
+Screens marked 🔄 have implementation complete and are awaiting final manual
+smoke test validation. Screens marked ⚠️ have no backend controller yet.
+Both categories MUST be fully cleared before new features are layered on top
+of them (see Principle IV).
 
 ### Queijaria Domain (Local-Only, Pending Backend)
 
@@ -253,4 +257,4 @@ with the six core principles. Violations MUST be justified in the
 Runtime development guidance lives in `CLAUDE.md` (project root) and the
 `.specify/` directory.
 
-**Version**: 1.2.0 | **Ratified**: 2026-06-02 | **Last Amended**: 2026-06-14
+**Version**: 1.2.1 | **Ratified**: 2026-06-02 | **Last Amended**: 2026-06-15

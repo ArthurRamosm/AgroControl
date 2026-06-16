@@ -4,8 +4,8 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 
@@ -90,9 +90,10 @@ export default function BottomMenu() {
   const navigation = useNavigation<any>();
   const route = useRoute();
   const activeKey = ROUTE_MAP[route.name] ?? '';
+  const insets = useSafeAreaInsets();
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingBottom: insets.bottom + 8 }]}>
       {TABS.map((tab) => {
         const isActive = activeKey === tab.key;
         return (
@@ -124,7 +125,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#e8e8e8',
-    paddingBottom: Platform.OS === 'ios' ? 20 : 8,
     paddingTop: 8,
     elevation: 8,
     shadowColor: '#000',
