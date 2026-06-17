@@ -1,5 +1,6 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
 import * as SQLite from 'expo-sqlite';
 import { Platform } from 'react-native';
 
@@ -39,6 +40,14 @@ function pad2(n: number): string {
 function fmt(v: number | null | undefined): string {
   if (v === null || v === undefined) return '';
   return String(v);
+}
+
+// [OWASP M4-01] Escapa valores antes de interpolar no HTML do PDF, evitando
+// que dados do usuário (nome da propriedade, lote, observação, etc.) quebrem
+// a estrutura da tabela ou injetem HTML/script no documento gerado.
+function esc(v: any): string {
+  if (v == null || v === '') return '';
+  return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function buildHtml(
@@ -88,9 +97,9 @@ function buildHtml(
           <td class="num">${r ? fmt(r.leite_tarde) : ''}</td>
           <td class="num">${r ? fmt(r.queijo_manha) : ''}</td>
           <td class="num">${r ? fmt(r.queijo_tarde) : ''}</td>
-          <td>${r?.lote_manha ?? ''}</td>
-          <td>${r?.lote_tarde ?? ''}</td>
-          <td class="obs">${r?.observacao ?? ''}</td>
+          <td>${esc(r?.lote_manha)}</td>
+          <td>${esc(r?.lote_tarde)}</td>
+          <td class="obs">${esc(r?.observacao)}</td>
         </tr>`);
     }
   }
@@ -127,25 +136,25 @@ function buildHtml(
 <table class="info-table" style="margin-bottom:6px">
   <tr>
     <td class="label">Produtor</td>
-    <td>${info.proprietario}</td>
+    <td>${esc(info.proprietario)}</td>
     <td class="label">Nº do Certificado</td>
     <td></td>
   </tr>
   <tr>
     <td class="label">Propriedade</td>
-    <td>${info.nome}</td>
+    <td>${esc(info.nome)}</td>
     <td class="label">Microrregião</td>
     <td>Canastra</td>
   </tr>
   <tr>
     <td class="label">Município</td>
-    <td>${info.cidade} – ${info.estado}</td>
+    <td>${esc(info.cidade)} – ${esc(info.estado)}</td>
     <td class="label">MÊS/ANO</td>
     <td>${mesNome} / ${ano}</td>
   </tr>
   <tr>
     <td class="label">Estado</td>
-    <td>${info.estado}</td>
+    <td>${esc(info.estado)}</td>
     <td class="label">Frequência</td>
     <td>DIARIAMENTE</td>
   </tr>
@@ -240,12 +249,16 @@ export async function gerarPdfProducaoDiaria(
 
   const { uri } = await Print.printToFileAsync({ html });
 
-  const podeCompartilhar = await Sharing.isAvailableAsync();
-  if (podeCompartilhar) {
-    await Sharing.shareAsync(uri, {
-      mimeType: 'application/pdf',
-      dialogTitle: `PL 01/04 – ${pad2(mes)}/${ano}`,
-      UTI: 'com.adobe.pdf',
-    });
+  try {
+    const podeCompartilhar = await Sharing.isAvailableAsync();
+    if (podeCompartilhar) {
+      await Sharing.shareAsync(uri, {
+        mimeType: 'application/pdf',
+        dialogTitle: `PL 01/04 – ${pad2(mes)}/${ano}`,
+        UTI: 'com.adobe.pdf',
+      });
+    }
+  } finally {
+    await FileSystem.deleteAsync(uri, { idempotent: true });
   }
 }

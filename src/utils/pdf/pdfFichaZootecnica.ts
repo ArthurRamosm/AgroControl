@@ -1,5 +1,6 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
 import * as SQLite from 'expo-sqlite';
 import { Platform } from 'react-native';
 
@@ -432,12 +433,16 @@ export async function gerarPdfFichaZootecnica(
   const { uri } = await Print.printToFileAsync({ html });
 
   const nomeAnimal = esc(animalData.nome ?? animalData.brinco) || String(animalId);
-  const podeCompartilhar = await Sharing.isAvailableAsync();
-  if (podeCompartilhar) {
-    await Sharing.shareAsync(uri, {
-      mimeType: 'application/pdf',
-      dialogTitle: `Ficha Zootécnica – ${nomeAnimal}`,
-      UTI: 'com.adobe.pdf',
-    });
+  try {
+    const podeCompartilhar = await Sharing.isAvailableAsync();
+    if (podeCompartilhar) {
+      await Sharing.shareAsync(uri, {
+        mimeType: 'application/pdf',
+        dialogTitle: `Ficha Zootécnica – ${nomeAnimal}`,
+        UTI: 'com.adobe.pdf',
+      });
+    }
+  } finally {
+    await FileSystem.deleteAsync(uri, { idempotent: true });
   }
 }

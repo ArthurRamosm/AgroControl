@@ -14,6 +14,7 @@ import {
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../types/navigation';
@@ -417,14 +418,18 @@ export default function RelatoriosScreen({ navigation }: Props) {
         dadosAbertos.periodoLabel,
       );
       const { uri } = await Print.printToFileAsync({ html });
-      const podeCompartilhar = await Sharing.isAvailableAsync();
-      if (podeCompartilhar) {
-        await Sharing.shareAsync(uri, {
-          mimeType: 'application/pdf',
-          dialogTitle: 'Exportar Relatório AgroControl',
-        });
-      } else {
-        Alert.alert('Aviso', 'Compartilhamento não disponível neste dispositivo.');
+      try {
+        const podeCompartilhar = await Sharing.isAvailableAsync();
+        if (podeCompartilhar) {
+          await Sharing.shareAsync(uri, {
+            mimeType: 'application/pdf',
+            dialogTitle: 'Exportar Relatório AgroControl',
+          });
+        } else {
+          Alert.alert('Aviso', 'Compartilhamento não disponível neste dispositivo.');
+        }
+      } finally {
+        await FileSystem.deleteAsync(uri, { idempotent: true });
       }
     } catch (error) {
       Alert.alert('Erro', getMensagemErro(error));

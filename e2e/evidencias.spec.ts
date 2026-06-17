@@ -77,8 +77,9 @@ test.describe('01 — Autenticação', () => {
   });
 
   test('EVIDÊNCIA 02 — Login com credenciais válidas navega para Home', async ({ page }) => {
-    const user = process.env.TEST_USER ?? 'demo';
-    const pass = process.env.TEST_PASS ?? 'demo123';
+    const user = process.env.TEST_USER;
+    const pass = process.env.TEST_PASS;
+    if (!user || !pass) throw new Error('TEST_USER e TEST_PASS são obrigatórios (OWASP M1/M8).');
 
     await page.goto('/');
     await expect(page.getByPlaceholder('Usuário')).toBeVisible({ timeout: 15_000 });

@@ -1,5 +1,6 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
 import * as SQLite from 'expo-sqlite';
 import { Platform } from 'react-native';
 
@@ -43,6 +44,14 @@ function fmtNum(v: number | null | undefined): string {
   return String(v);
 }
 
+// [OWASP M4-01] Escapa valores antes de interpolar no HTML do PDF, evitando
+// que dados do usuário (nome da propriedade, responsável, ações corretivas,
+// etc.) quebrem a estrutura da tabela ou injetem HTML/script no documento gerado.
+function esc(v: any): string {
+  if (v == null || v === '') return '';
+  return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 function cloroFora(v: number | null): boolean {
   if (v === null || v === undefined) return false;
   return v < CLORO_MIN || v > CLORO_MAX;
@@ -78,7 +87,7 @@ function buildHtml(
     .filter(r => r.acoes_corretivas)
     .map(r => {
       const dia = r.data.slice(8, 10);
-      return `Dia ${dia}: ${r.acoes_corretivas}`;
+      return `Dia ${esc(dia)}: ${esc(r.acoes_corretivas)}`;
     })
     .join('<br>');
 
@@ -106,7 +115,7 @@ function buildHtml(
   // Células Responsável
   const tdResponsavel = Array.from({ length: totalDias }, (_, i) => i + 1).map(d => {
     const r = porDia[d];
-    return `<td class="resp">${r?.responsavel ?? ''}</td>`;
+    return `<td class="resp">${esc(r?.responsavel)}</td>`;
   }).join('');
 
   const mesNome = MESES_PT[mes];
@@ -140,9 +149,9 @@ function buildHtml(
 <table class="info-table">
   <tr>
     <td class="label">Propriedade</td>
-    <td>${info.nome}</td>
+    <td>${esc(info.nome)}</td>
     <td class="label">Município</td>
-    <td>${info.cidade} – ${info.estado}</td>
+    <td>${esc(info.cidade)} – ${esc(info.estado)}</td>
     <td class="label">ANO</td>
     <td>${ano}</td>
     <td class="label">Frequência</td>
@@ -150,9 +159,9 @@ function buildHtml(
   </tr>
   <tr>
     <td class="label">Produtor</td>
-    <td colspan="5">${info.proprietario}</td>
+    <td colspan="5">${esc(info.proprietario)}</td>
     <td class="label">Responsável</td>
-    <td>${responsavelFinal}</td>
+    <td>${esc(responsavelFinal)}</td>
   </tr>
   <tr>
     <td class="label">Mês</td>
@@ -233,12 +242,16 @@ export async function gerarPdfPotabilidade(
 
   const { uri } = await Print.printToFileAsync({ html });
 
-  const podeCompartilhar = await Sharing.isAvailableAsync();
-  if (podeCompartilhar) {
-    await Sharing.shareAsync(uri, {
-      mimeType: 'application/pdf',
-      dialogTitle: `PL 02/01 – Potabilidade ${pad2(mes)}/${ano}`,
-      UTI: 'com.adobe.pdf',
-    });
+  try {
+    const podeCompartilhar = await Sharing.isAvailableAsync();
+    if (podeCompartilhar) {
+      await Sharing.shareAsync(uri, {
+        mimeType: 'application/pdf',
+        dialogTitle: `PL 02/01 – Potabilidade ${pad2(mes)}/${ano}`,
+        UTI: 'com.adobe.pdf',
+      });
+    }
+  } finally {
+    await FileSystem.deleteAsync(uri, { idempotent: true });
   }
 }

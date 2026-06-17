@@ -1,0 +1,123 @@
+{
+  "categoria_owasp": "M10 - Insufficient Cryptography (OWASP Mobile Top 10 2024)",
+  "projeto": "AgroControl",
+  "data_analise": "2026-06-17",
+  "metodo": "Inspeção completa de todas as implementações criptográficas: src/services/session.ts (hashing offline, SecureStore), AgroControl.API/Services/AuthService.cs (BCrypt), AgroControl.API/Controllers/AuthController.cs (SHA-256 em log e anonimização), package.json (expo-crypto 15.0.9, expo-secure-store 15.0.8), AgroControl.API/AgroControl.API.csproj (BCrypt.Net-Next 4.2.0), appsettings.json (connection strings), busca por Math.random, MD5, SHA1, DES, AES, RSA, JWT, keys, secrets, encrypt, decrypt em todo o codebase frontend e backend.",
+  "sumario_executivo": {
+    "perfil_criptografico": "O app apresenta uma postura criptográfica acima da média para aplicações mobile: BCrypt no servidor, expo-secure-store (Keychain/Keystore) para armazenamento de credenciais, expo-crypto para SHA-256, sem qualquer algoritmo proibido (MD5, SHA1, DES, RC4), sem uso de Math.random() para fins criptográficos, sem implementações próprias de criptografia. O único achado de nível médio é o sal fixo hardcoded no hash offline de senha — corrigido nesta sessão com sal aleatório por-dispositivo armazenado no próprio SecureStore.",
+    "achado_mais_critico": "M10-01 — sal fixo ('agrocontrol-offline-salt-v1') hardcoded no código-fonte (session.ts:29). Um atacante que descompile o APK/IPA obtém o sal imediatamente, tornando o hash SHA-256 offline computacionalmente equivalente a um hash sem sal — facilita ataques de dicionário contra o hash caso ele seja extraído do SecureStore (requer root/jailbreak). Corrigido com sal aleatório de 32 bytes gerado em primeira execução via Crypto.getRandomBytesAsync() e persistido no SecureStore.",
+    "contraponto_positivo": "BCrypt no servidor com fator de custo padrão (10 rounds). expo-secure-store usando EncryptedSharedPreferences no Android e Keychain no iOS. Nenhum JWT ou token sem assinatura. Nenhum MD5/SHA1/DES/3DES/RC4. Nenhuma chave de criptografia simétrica hardcoded. Nenhum uso de Math.random() para geração de tokens. Nenhuma implementação criptográfica caseira."
+  },
+  "achados": [
+    {
+      "id": "M10-01",
+      "titulo": "Sal fixo hardcoded para hash offline de senha",
+      "checkpoint": "5. Chaves hardcoded + 3. Gerenciamento de chaves",
+      "cwe": "CWE-760 — Use of a One-Way Hash with a Predictable Salt",
+      "referencia_nist": "NIST SP 800-132 §5.1 — A salt value shall be randomly generated using an approved random bit generator and be at least 128 bits in length.",
+      "severidade": "Médio",
+      "componente": "src/services/session.ts:29",
+      "evidencia": {
+        "codigo": "const LOCAL_SALT = 'agrocontrol-offline-salt-v1'; // hardcoded, visível no APK",
+        "uso": "hashSenha() em session.ts:32 concatena LOCAL_SALT + ':' + senha e passa para SHA-256. O resultado é gravado no SecureStore como hash offline para verificação local (ConfiguracoesScreen: alterar senha, excluir conta).",
+        "visibilidade": "O sal está no código JavaScript empacotado no bundle do Expo. Qualquer ferramenta de análise estática (jadx, frida, strings) lê o bundle e extrai o sal em texto claro. O APK do Expo Go / standalone não ofusca o JavaScript bundle por padrão (M7-01 já documentado).",
+        "impacto_pratico": "Com o sal conhecido: atacante que extraiu o hash do SecureStore (root/jailbreak necessário) pode precomputar uma rainbow table de SHA-256('agrocontrol-offline-salt-v1:' + candidate) para cada possível senha e comparar com o hash extraído. Tempo estimado para uma senha de 6 dígitos numéricos: milissegundos (10^6 = 1 milhão de candidatos)."
+      },
+      "causa_raiz": "Sal definido como constante de módulo em vez de gerado aleatoriamente na primeira execução e armazenado no SecureStore — arquitetura que não existia quando o hash offline foi implementado (M1-01).",
+      "ataque": "1. Atacante obtém dispositivo com root habilitado. 2. Extrai SecureStore via `adb shell su -c 'cat /data/data/com.anonymous.AgroControl/shared_prefs/...encrypted...'` (ou via Frida hook em SecureStore.getItemAsync). 3. Lê o valor de `agrocontrol_senha_hash` (hash hex de 64 chars). 4. Lê `LOCAL_SALT` do JavaScript bundle (`strings classes.dex | grep agrocontrol-offline-salt`). 5. Itera sobre dicionário de senhas comuns: `SHA256('agrocontrol-offline-salt-v1:password')` → compara com hash extraído → senha encontrada. Para senhas de dicionário (top 10.000): < 100ms.",
+      "status": "Corrigido",
+      "correcao_aplicada": "Substituído sal fixo por sal aleatório de 32 bytes gerado via Crypto.getRandomBytesAsync(32) na primeira execução do app e persistido no SecureStore (chave: 'agrocontrol_local_salt'). Implementado caminho de migração transparente em verifyPasswordOffline(): se o hash armazenado não bater com o novo sal por-dispositivo, tenta o sal fixo legado — se bater, re-salva o hash com o sal por-dispositivo e retorna true. Assim usuários com hash gravado antes da correção são migrados transparentemente sem exigir novo login.",
+      "before": "const LOCAL_SALT = 'agrocontrol-offline-salt-v1';\nasync function hashSenha(senha: string): Promise<string> {\n  return Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, `${LOCAL_SALT}:${senha}`);\n}",
+      "after": "const LOCAL_SALT_KEY = 'agrocontrol_local_salt';\nconst LEGACY_SALT = 'agrocontrol-offline-salt-v1'; // migração apenas\nasync function getOrCreateSalt(): Promise<string> {\n  const stored = await SecureStore.getItemAsync(LOCAL_SALT_KEY);\n  if (stored) return stored;\n  const bytes = await Crypto.getRandomBytesAsync(32);\n  const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');\n  await SecureStore.setItemAsync(LOCAL_SALT_KEY, hex);\n  return hex;\n}\nasync function hashSenha(senha: string): Promise<string> {\n  const salt = await getOrCreateSalt();\n  return Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, `${salt}:${senha}`);\n}"
+    },
+    {
+      "id": "M10-02",
+      "titulo": "SHA-256 simples como verificador offline de senha — não é KDF",
+      "checkpoint": "7. Hashing de senhas",
+      "cwe": "CWE-916 — Use of Password Hash With Insufficient Computational Effort",
+      "referencia_nist": "NIST SP 800-132 §5.3 — Password-Based Key Derivation Functions (PBKDFs) shall be used when passwords are used as a source for deriving keys or in password-based authentication.",
+      "severidade": "Baixo",
+      "componente": "src/services/session.ts:31-36",
+      "evidencia": {
+        "codigo": "Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, `${salt}:${senha}`)",
+        "problema": "SHA-256 é uma função de hash criptográfico de propósito geral, projetada para ser RÁPIDA. Uma GPU moderna calcula ~10 bilhões de SHA-256/segundo. Um KDF (bcrypt, PBKDF2, Argon2) é projetado para ser LENTO: o fator de custo garante que cada tentativa leve dezenas de ms — tornando ataques de força bruta inviáveis mesmo com a GPU mais potente disponível (10 tentativas/segundo em bcrypt cost=12 vs 10 bilhões/segundo em SHA-256).",
+        "mitigantes": [
+          "Esta função é usada APENAS para verificação offline secundária (confirmar senha em ConfiguracoesScreen). Autenticação primária usa BCrypt no servidor.",
+          "O hash é armazenado no SecureStore (Keychain/Keystore) — extração requer root/jailbreak.",
+          "Com a correção M10-01 (sal por-dispositivo), ataques de precomputação são eliminados — attacker precisa rodar o ataque no dispositivo específico."
+        ]
+      },
+      "causa_raiz": "expo-crypto não expõe PBKDF2 nativamente (apenas digest, HMAC, getRandomBytes). A alternativa mais forte disponível seria PBKDF2 via react-native-quick-crypto, mas requer native build (incompatível com Expo Go).",
+      "status": "Pendente — risco residual aceitável dado contexto",
+      "correcao_aplicada": null,
+      "remediacao": {
+        "implementacao_futura": "Na fase de migração para bare workflow / EAS Build com prebuild, considerar react-native-quick-crypto que expõe crypto.pbkdf2Sync() com suporte a PBKDF2-SHA256 com 600.000 iterações (recomendação OWASP 2024):\n```typescript\nimport { pbkdf2 } from 'react-native-quick-crypto';\n// 600.000 iter, salt 32 bytes, output 32 bytes\nconst derivedKey = await pbkdf2(senha, salt, 600000, 32, 'sha256');\n```",
+        "mitigacao_imediata": "Já aplicada: sal aleatório por-dispositivo (M10-01) elimina precomputação. Armazenamento no SecureStore limita extração a cenários de root/jailbreak."
+      }
+    },
+    {
+      "id": "M10-03",
+      "titulo": "Fallback de autenticação em texto plano no servidor",
+      "checkpoint": "7. Hashing de senhas — compatibilidade legada",
+      "cwe": "CWE-256 — Plaintext Storage of a Password",
+      "referencia_nist": "NIST SP 800-63B §5.1.1.2 — Verifiers shall store memorized secrets in a form that is resistant to offline attacks.",
+      "severidade": "Baixo",
+      "componente": "AgroControl.API/Services/AuthService.cs:36",
+      "evidencia": {
+        "codigo": "// Compatibilidade com contas criadas antes da correção do OWASP M1.\nreturn senhaArmazenada == senhaInformada;",
+        "contexto": "VerificarSenha() aceita texto plano como fallback quando a senha armazenada não começa com '$2' (prefixo BCrypt). Contas criadas antes da correção M1-06 ainda têm senhas em texto plano no banco — na primeira autenticação bem-sucedida, a senha é re-gravada como BCrypt (migração automática em LoginAsync:56).",
+        "janela_de_risco": "Enquanto existirem contas que nunca fizeram login após a correção M1 — ou seja, contas legadas que ainda têm a senha em texto plano no banco SQL Server. O risco termina quando todos os usuários migram (próximo login de cada um)."
+      },
+      "causa_raiz": "Necessidade de retrocompatibilidade na migração M1 (senha em texto plano → BCrypt). Decisão de design intencional e documentada.",
+      "ataque": "Atacante com acesso de leitura ao banco de dados (ex.: SQL injection em outro endpoint, backup exposto) lê a coluna Senha de contas legadas e obtém a senha em texto plano diretamente — sem necessidade de ataque de força bruta.",
+      "status": "Pendente — auto-remediado no próximo login de cada usuário",
+      "correcao_aplicada": null,
+      "remediacao": {
+        "curto_prazo": "Executar script de migração em lote no banco: para cada usuario WHERE Senha NOT LIKE '$2%', exigir troca de senha no próximo login (flag `senha_expirada = true`) em vez de aceitar o texto plano indefinidamente.",
+        "mitigacao_presente": "A auto-migração em LoginAsync garante que o texto plano é apagado e substituído por BCrypt no primeiro login — o fallback se auto-elimina com o uso normal do app. Risco decresce organicamente com o tempo."
+      }
+    },
+    {
+      "id": "M10-04",
+      "titulo": "HashLog usa prefixo de 8 chars de SHA-256 — não confere autenticidade",
+      "checkpoint": "8. Implementações próprias",
+      "cwe": "CWE-347 — Improper Verification of Cryptographic Signature",
+      "severidade": "Informativo",
+      "componente": "AgroControl.API/Controllers/AuthController.cs:186",
+      "evidencia": {
+        "codigo": "private static string HashLog(string value) =>\n    Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)))[..8];",
+        "uso": "Pseudonimiza o nome de usuário em logs de INFO para evitar gravação de PII em logs de longo prazo (M6-02). Os 8 primeiros caracteres hex (32 bits) do SHA-256 identificam o usuário nos logs.",
+        "limitacao": "32 bits de espaço de saída → probabilidade de colisão de ~1:4 bilhões (birthday problem: ~65.536 usuários para 50% de chance de colisão). Para um app com poucos usuários, sem impacto prático. SHA-256 simples não é autenticado — não há HMAC — mas logs não precisam de autenticidade aqui, apenas pseudonimização."
+      },
+      "causa_raiz": "Escolha de design deliberada: o prefixo curto facilita correlação de logs pelo suporte técnico sem revelar o nome completo. Não é uma falha de segurança, é uma limitação de design de observabilidade.",
+      "status": "Informativo — sem ação recomendada",
+      "correcao_aplicada": null,
+      "remediacao": "Se o número de usuários crescer significativamente (> 10.000), aumentar para 12 chars (48 bits) para manter a separabilidade. Para logs que necessitem de não-repúdio, adicionar HMAC-SHA256 com chave derivada de uma secret de servidor. Baixa prioridade para o perfil de uso atual."
+    }
+  ],
+  "verificacoes_sem_achados": [
+    "MD5 / SHA1 para fins de segurança: busca por 'MD5', 'SHA1', 'SHA-1', 'MessageDigest' em todo o projeto — 0 ocorrências. SHA-256 é o algoritmo de menor força encontrado, e apenas em contextos não críticos (log, verificação offline secundária).",
+    "DES / 3DES / RC4 / RC2: busca em todo o projeto — 0 ocorrências. Nenhum algoritmo simétrico fraco encontrado.",
+    "RSA com chave < 2048 bits / AES com bloco < 128 bits / ECB mode: nenhum uso explícito de RSA, AES ou modo de operação de bloco no código da aplicação. A criptografia de transporte (TLS) e de armazenamento (SecureStore) é delegada inteiramente às APIs da plataforma (iOS CryptoKit / Android Keystore) — que usam AES-256-GCM e RSA-2048+ por padrão do SO.",
+    "Math.random() para fins criptográficos: busca por 'Math.random' em todo src/ — encontrado 0 usos. Toda geração de aleatoriedade criptográfica usa Crypto.getRandomBytesAsync() (após M10-01).",
+    "JWT sem assinatura / alg:none: o app não usa JWT. Autenticação é baseada em objeto de sessão serializado no SecureStore — sem token de sessão trafegado no header das requisições à API. Ausência de JWT é documentada como achado de M3 (ausência de autenticação de endpoint), fora do escopo de M10.",
+    "Implementações criptográficas próprias (homebrew crypto): nenhuma. Todas as operações criptográficas usam bibliotecas auditadas: BCrypt.Net-Next (backend) e expo-crypto / expo-secure-store (frontend).",
+    "Chaves de criptografia hardcoded além do sal: nenhuma chave AES, RSA, HMAC ou similar encontrada no código-fonte ou em assets. A connection string no appsettings.json usa autenticação Windows integrada (Trusted_Connection=True) — sem senha no arquivo de configuração.",
+    "CVEs em bibliotecas criptográficas: BCrypt.Net-Next 4.2.0 — sem CVEs conhecidos na base NVD; é a versão mais recente da biblioteca no momento da análise. expo-crypto 15.0.9 usa as APIs criptográficas nativas do SO (CryptoKit/AndroidCrypto) — sem CVEs próprios conhecidos. expo-secure-store 15.0.8 — sem CVEs conhecidos; usa Keychain Services (iOS) / EncryptedSharedPreferences com AES-256-GCM (Android API 23+).",
+    "Nonce / IV reutilizados: não há uso direto de cifras simétricas com IV na camada de aplicação — delegado ao TLS e ao SecureStore. Sem oportunidade de reutilização de IV no código da aplicação.",
+    "Curvas elípticas fracas (< secp256k1 / P-256): nenhum uso explícito de ECDH ou ECDSA no código. TLS usa as curvas suportadas pelo servidor (ASP.NET Core / Kestrel — P-256 e P-384 por padrão no .NET 9)."
+  ],
+  "resumo_risco": {
+    "medio": 1,
+    "baixo": 2,
+    "informativo": 1
+  },
+  "nivel_geral_m10": "Baixo-Médio — apenas 1 achado de nível médio (M10-01, corrigido). O perfil criptográfico geral é sólido: BCrypt no servidor, expo-secure-store para chaves, sem algoritmos proibidos, sem crypto caseira.",
+  "correcoes_aplicadas_nesta_sessao": [
+    "M10-01: Substituído sal fixo hardcoded por sal aleatório de 32 bytes por-dispositivo (Crypto.getRandomBytesAsync) persistido no SecureStore. Implementado caminho de migração transparente em verifyPasswordOffline() para hashes existentes com sal legado."
+  ],
+  "correcoes_pendentes": [
+    "M10-02: SHA-256 não é KDF para verificação offline — requer react-native-quick-crypto (nativo, incompatível com Expo Go). Documentado para fase de EAS Build com prebuild.",
+    "M10-03: Fallback de texto plano em VerificarSenha — auto-eliminado organicamente com o uso (próximo login de cada conta legada). Opcionalmente, forçar troca de senha com flag no banco."
+  ]
+}

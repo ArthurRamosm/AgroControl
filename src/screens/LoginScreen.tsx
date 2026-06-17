@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform,
@@ -11,6 +11,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
 import { api, getMensagemErro } from '../config/api';
 import { saveSession, savePasswordForOffline } from '../services/session';
+import * as ScreenCapture from 'expo-screen-capture';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PRIMARY = '#1a3d1f';
@@ -31,6 +32,13 @@ type Props = {
 };
 
 export default function LoginScreen({ navigation }: Props) {
+  useEffect(() => {
+    ScreenCapture.allowScreenCaptureAsync();
+    return () => {
+      ScreenCapture.preventScreenCaptureAsync();
+    };
+  }, []);
+
   const [usuario, setUsuario] = useState('');
   const [senha, setSenha] = useState('');
   const [carregando, setCarregando] = useState(false);
@@ -102,6 +110,9 @@ export default function LoginScreen({ navigation }: Props) {
               placeholder="Usuário"
               placeholderTextColor="#bbb"
               autoCapitalize="none"
+              autoCorrect={false}
+              textContentType="username"
+              autoComplete="username"
               value={usuario}
               onChangeText={t => { setUsuario(t); setErro(''); }}
             />
@@ -118,6 +129,9 @@ export default function LoginScreen({ navigation }: Props) {
               placeholder="Senha"
               placeholderTextColor="#bbb"
               secureTextEntry={!senhaVisivel}
+              autoCorrect={false}
+              textContentType="password"
+              autoComplete="current-password"
               value={senha}
               onChangeText={t => { setSenha(t); setErro(''); }}
             />

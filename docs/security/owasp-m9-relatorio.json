@@ -1,0 +1,192 @@
+{
+  "categoria_owasp": "M9 - Insecure Data Storage (OWASP Mobile Top 10 2024)",
+  "projeto": "AgroControl",
+  "data_analise": "2026-06-17",
+  "metodo": "Inspeção de src/services/session.ts (AsyncStorage vs SecureStore), src/database/localDb.ts + fazendaSchema.ts (SQLite, tabelas, PRAGMA), package.json (ausência de SQLCipher/expo-file-system), src/utils/pdf/*.ts + src/screens/RelatoriosScreen.tsx (Print.printToFileAsync, Sharing.shareAsync), busca por Clipboard, FLAG_SECURE, preventScreenCapture, expo-screen-capture em todo src/, e verificação de atributos de TextInput (secureTextEntry, textContentType, autoComplete, autoCorrect) em LoginScreen.tsx, RegisterScreen.tsx e ConfiguracoesScreen.tsx.",
+  "sumario_executivo": {
+    "perfil_geral": "O app demonstra uma postura de armazenamento seguro acima da média para apps React Native: AsyncStorage foi completamente migrado para expo-secure-store (M1), não há uso de Clipboard, e os campos de senha usam secureTextEntry corretamente. O principal vetor de risco persiste no SQLite local não criptografado (já identificado em M6-04), que é ampliado pela descoberta M9-02: 14 arquivos de geração de PDF não apagam os arquivos temporários após o compartilhamento, deixando cópias de documentos de conformidade regulatória no diretório de cache do app.",
+    "achado_mais_critico": "M9-01 — SQLite não criptografado: ~20 tabelas com dados financeiros (receitas, despesas), de produção (controle leiteiro, venda queijo) e de saúde animal (mastite, parasitas) ficam em texto plano em agrocontrol.db + agrocontrol.db-wal no armazenamento interno do app, acessíveis sem ferramentas especializadas em dispositivos com root.",
+    "pontos_positivos": [
+      "AsyncStorage: completamente migrado para expo-secure-store (M1). Nenhum dado sensível em AsyncStorage.",
+      "expo-secure-store: usado corretamente para SESSION_KEY e PASSWORD_HASH_KEY com apagamento em logout (clearPersistedSession).",
+      "Clipboard: nenhum uso de expo-clipboard ou Clipboard API em todo src/.",
+      "Logs de produção: console.* removidos por babel-plugin (M7-05); logs INFO pseudonimizados (M6-02).",
+      "Senha offline: salva como SHA-256 com sal fixo (M1-01) — nunca em texto plano.",
+      "allowBackup=false: configurado em M8-01 — previne extração via adb backup.",
+      "secureTextEntry: aplicado corretamente em todos os campos de senha de LoginScreen, RegisterScreen e ConfiguracoesScreen."
+    ]
+  },
+  "achados": [
+    {
+      "id": "M9-01",
+      "titulo": "SQLite local sem criptografia — 20 tabelas com dados financeiros e de saúde",
+      "checkpoint": "2. SQLite: banco criptografado com SQLCipher? Backups incluídos?",
+      "cwe": "CWE-312 — Cleartext Storage of Sensitive Information",
+      "severidade": "Alto",
+      "componentes": [
+        "src/database/localDb.ts (initDatabase — sem PRAGMA key ou cipher_version)",
+        "src/database/fazendaSchema.ts (20 tabelas definidas)",
+        "src/database/localDb.ts:19 (PRAGMA journal_mode = WAL — cria arquivo -wal adicional)"
+      ],
+      "evidencia": {
+        "abertura_sem_chave": "localDb.ts:16 — `const database = await SQLite.openDatabaseAsync('agrocontrol.db');` — abertura sem PRAGMA key ou opção de criptografia. expo-sqlite (SQLite padrão) não suporta SQLCipher nativamente.",
+        "wal_mode": "localDb.ts:19 — `await database.runAsync('PRAGMA journal_mode = WAL');` — o modo WAL cria um arquivo adicional `agrocontrol.db-wal` (Write-Ahead Log) TAMBÉM sem criptografia. Um ataque bem-sucedido precisa extrair AMBOS os arquivos para obter o estado completo do banco.",
+        "tabelas_sensiveis": [
+          "despesa_detalhe: data_compra, data_pagamento, descricao, valor_total, categoria_ima",
+          "receita_detalhe: data_venda, data_recebimento, descricao, valor_total",
+          "venda_queijo: cliente, tipo_queijo, quantidade_unid, total_rs",
+          "pl_rastreabilidade: data_venda, quantidade_kg, lote, comprador, endereco_comprador",
+          "controle_leiteiro: kg_dia, litros_dia, vp_preco, vs",
+          "mastite_clinica / mastite_subclinica_animal: nome_vaca, diagnostico, teto_1..4",
+          "animal_local (dados_json): dados completos do animal incluindo nome, historico"
+        ],
+        "localizacao_arquivo": "Android: /data/data/com.anonymous.AgroControl/databases/agrocontrol.db (requer root). iOS: Library/Application Support/AgroControl/SQLite/agrocontrol.db (requer jailbreak).",
+        "referencia_m6": "Já documentado como M6-04 (Privacy Risk Score: Médio) — cruzado aqui por ser o achado de maior criticidade do M9."
+      },
+      "ataque_dispositivo_normal": "Acesso físico ao dispositivo + USB debugging habilitado → `adb backup` bloqueado por allowBackup=false (M8-01). Sem root, não há extração direta do banco.",
+      "ataque_rooted": "adb shell → `su` → `cp /data/data/com.anonymous.AgroControl/databases/agrocontrol.db* /sdcard/` → `adb pull /sdcard/agrocontrol.db` + `adb pull /sdcard/agrocontrol.db-wal` → `sqlite3 agrocontrol.db 'SELECT * FROM despesa_detalhe'` → acesso a todos os dados financeiros. Tempo estimado: 5 minutos.",
+      "criticidade": {
+        "tipo_dado": "Dados financeiros e de negócio (receitas, despesas, produção, saúde animal). Não pessoais de terceiros, mas comercialmente confidenciais e potencialmente tributariamente relevantes.",
+        "impacto": "Exposição completa do histórico financeiro e produtivo da propriedade rural."
+      },
+      "status": "Pendente — requer avaliação de compatibilidade com expo-sqlite (SQLite padrão não suporta SQLCipher; substituição por op-sqlite com SQLCipher requer native prebuild = incompatível com Expo Go). Documentado para implementação na fase de migration para bare workflow ou EAS Build com prebuild.",
+      "correcao_aplicada": null,
+      "remediacao": {
+        "opcao_a": "Migrar para `@op-engineering/op-sqlite` com suporte nativo a SQLCipher:\n```typescript\nimport { open } from '@op-engineering/op-sqlite';\nconst db = open({ name: 'agrocontrol.db', encryptionKey: await SecureStore.getItemAsync('db_key') ?? generateAndStoreKey() });\n```\nRequer EAS Build + prebuild (não funciona em Expo Go).",
+        "opcao_b": "Criptografia no nível de campo: serializar dados sensíveis com AES antes de inserir no SQLite. Mais trabalhoso mas compatível com expo-sqlite atual:\n```typescript\nimport * as Crypto from 'expo-crypto';\n// Antes de INSERT: encrypt(dados_json, chave_derivada_de_securestore)\n// Antes de SELECT: decrypt(dados_json_encriptado, chave)\n```",
+        "mitigacao_imediata": "Já aplicada em M8-01: android.allowBackup=false previne extração via adb backup. O acesso requer root — risco residual aceitável no curto prazo para o perfil de ameaça de um app agropecuário de uso interno."
+      }
+    },
+    {
+      "id": "M9-02",
+      "titulo": "PDFs de conformidade regulatória persistem no cache do app após compartilhamento",
+      "checkpoint": "4. Arquivos locais: salvos com permissões corretas? Caminhos de armazenamento seguros?",
+      "cwe": "CWE-312 — Cleartext Storage of Sensitive Information",
+      "severidade": "Médio",
+      "componentes": [
+        "src/utils/pdf/pdfAnaliseLab.ts:226",
+        "src/utils/pdf/pdfFichaZootecnica.ts:432",
+        "src/utils/pdf/pdfMastiteSubclinica.ts:252",
+        "src/utils/pdf/pdfDepositoLimpeza.ts:237",
+        "src/utils/pdf/pdfHigienizacaoEquip.ts:260",
+        "src/utils/pdf/pdfParasitas.ts:314",
+        "src/utils/pdf/pdfPotabilidade.ts:242",
+        "src/utils/pdf/pdfMastiteClinica.ts:217",
+        "src/utils/pdf/pdfHigieneCaixa.ts:167",
+        "src/utils/pdf/pdfProducaoDiaria.ts:249",
+        "src/utils/pdf/pdfRastreabilidade.ts:196",
+        "src/utils/pdf/pdfVendaQueijo.ts:240",
+        "src/utils/pdf/pdfVestiario.ts:248",
+        "src/utils/pdf/pdfControleLeiteiro.ts:279",
+        "src/screens/RelatoriosScreen.tsx:419"
+      ],
+      "evidencia": {
+        "padrao_codigo": "Em todos os 15 pontos de geração de PDF:\n```typescript\nconst { uri } = await Print.printToFileAsync({ html });\nconst podeCompartilhar = await Sharing.isAvailableAsync();\nif (podeCompartilhar) {\n  await Sharing.shareAsync(uri, { mimeType: 'application/pdf', ... });\n}\n// FIM — uri nunca é deletado\n```",
+        "localizacao_cache": "expo-print grava o PDF em: Android: /data/user/0/com.anonymous.AgroControl/cache/ExponentExperienceData/.../print-XXXXXX.pdf. iOS: /private/var/mobile/.../tmp/print-XXXXXX.pdf. O diretório cache não é limpo automaticamente até que o SO decida liberar espaço.",
+        "conteudo_sensivel": [
+          "pdfRastreabilidade: nome do comprador, endereço do comprador, quantidade vendida, lote",
+          "pdfVendaQueijo: cliente, tipo, peso, preço por kg, total em R$",
+          "pdfControleLeiteiro: volume de leite/dia, preço por litro, volume vendido",
+          "pdfProducaoDiaria: produção de leite/queijo por turno, lotes",
+          "pdfFichaZootecnica: dados completos do animal incluindo histórico reprodutivo"
+        ]
+      },
+      "ataque_dispositivo_normal": "Atacante com acesso físico ao dispositivo com USB debugging → `adb shell run-as com.anonymous.AgroControl ls cache/` → encontra arquivos print-*.pdf → `adb pull` os PDFs. Não requer root — `run-as` funciona em emuladores e dispositivos com debugging habilitado.",
+      "ataque_rooted": "Root → `ls /data/data/com.anonymous.AgroControl/cache/` → encontra PDFs acumulados de todas as sessões anteriores não limpas. Risco é cumulativo: cada geração de PDF adiciona um arquivo ao cache.",
+      "criticidade": {
+        "tipo_dado": "Documentos de conformidade regulatória com dados comerciais (comprador, endereço, preços, volumes financeiros).",
+        "agravante": "O cache acumula PDFs de sessões anteriores — se o usuário gerou 50 relatórios em 6 meses, todos ficam no cache até limpeza manual."
+      },
+      "status": "Corrigido",
+      "correcao_aplicada": "Instalado expo-file-system. Adicionado `await FileSystem.deleteAsync(uri, { idempotent: true })` após Sharing.shareAsync() em todos os 15 locais de geração de PDF. O arquivo temporário é apagado imediatamente após o compartilhamento — em caso de erro no compartilhamento, o arquivo também é apagado no bloco finally para garantir limpeza.",
+      "before": "await Sharing.shareAsync(uri, { ... });\n// arquivo permanece em cache indefinidamente",
+      "after": "await Sharing.shareAsync(uri, { ... });\nawait FileSystem.deleteAsync(uri, { idempotent: true }); // limpeza imediata"
+    },
+    {
+      "id": "M9-03",
+      "titulo": "Sem prevenção de screenshot (FLAG_SECURE) em telas com dados financeiros",
+      "checkpoint": "8. Snapshots de tela: app bloqueia screenshots em telas sensíveis (FLAG_SECURE)?",
+      "cwe": "CWE-359 — Exposure of Private Personal Information to an Unauthorized Actor",
+      "severidade": "Baixo",
+      "componentes": [
+        "src/screens/financeiro/DespesaDetalheScreen.tsx (valores de despesas)",
+        "src/screens/financeiro/ReceitaDetalheScreen.tsx (valores de receitas)",
+        "src/screens/FinanceiroScreen.tsx (resumo financeiro completo)"
+      ],
+      "evidencia": "Busca por 'expo-screen-capture', 'FLAG_SECURE', 'preventScreenCapture' em todo src/: 0 ocorrências. O switcher de aplicativos do Android e do iOS captura um snapshot da tela atual ao pressionar o botão home — esse snapshot fica visível para qualquer app com permissão de leitura da tela (ex.: apps de acessibilidade) e é armazenado temporariamente pelo SO.",
+      "ataque": "Em Android: apps com permissão BIND_ACCESSIBILITY_SERVICE podem ler o conteúdo de tela em tempo real — sem screenshot explícito pelo usuário. No switcher de apps, o preview da última tela ativa fica visível para qualquer pessoa que pegue o dispositivo desbloqueado.",
+      "criticidade": {
+        "tipo_dado": "Dados financeiros (receitas, despesas, balanços) e de produção visíveis no preview do switcher.",
+        "mitigante": "O risco requer acesso físico ao dispositivo desbloqueado — não é um ataque remoto. Para um app agropecuário de uso individual, o impacto é limitado."
+      },
+      "status": "Pendente — requer decisão de UX",
+      "correcao_aplicada": null,
+      "remediacao": {
+        "implementacao": "```bash\nnpx expo install expo-screen-capture\n```\n```typescript\n// Em FinanceiroScreen, DespesaDetalheScreen, ReceitaDetalheScreen:\nimport { usePreventScreenCapture } from 'expo-screen-capture';\nexport default function FinanceiroScreen() {\n  usePreventScreenCapture(); // bloqueia FLAG_SECURE no Android, overlay no iOS\n  ...\n}\n```",
+        "trade_off": "FLAG_SECURE bloqueia TODOS os screenshots nessas telas — inclusive screenshots legítimos do usuário para registro pessoal ou compartilhamento com contador. Para um app agropecuário onde compartilhar relatórios é uma funcionalidade central, bloquear screenshots pode degradar a experiência. Alternativa: aplicar apenas em telas de configuração/senha (LoginScreen, ConfiguracoesScreen), onde não há motivo legítimo para screenshot.",
+        "motivo_nao_aplicado": "Requer decisão do usuário sobre o trade-off UX vs segurança. Documentado para implementação seletiva."
+      }
+    },
+    {
+      "id": "M9-04",
+      "titulo": "Campos de senha sem atributos de segurança iOS/Android (textContentType / autoComplete)",
+      "checkpoint": "1. AsyncStorage / 9. Shared Preferences — dados sensíveis em autocomplete/sugestões",
+      "cwe": "CWE-312 — Cleartext Storage of Sensitive Information (keyboard cache)",
+      "severidade": "Baixo",
+      "componentes": [
+        "src/screens/LoginScreen.tsx:99 (campo usuário) e :115 (campo senha)",
+        "src/screens/RegisterScreen.tsx:305 (senha) e :332 (confirmar senha)",
+        "src/screens/ConfiguracoesScreen.tsx:380, 390, 400, 444 (campos de senha)"
+      ],
+      "evidencia": {
+        "login_screen": "TextInput de senha em LoginScreen.tsx:115 usa `secureTextEntry={!senhaVisivel}` (correto) mas não declara `textContentType` (iOS) nem `autoComplete` (Android). Sem estes atributos:\n- iOS: o teclado não oferece sugestões de senha do iCloud Keychain/Password Manager, forçando o usuário a digitar a senha manualmente toda vez.\n- Android: o AutoFill Framework do Android pode não reconhecer o campo como senha e oferecer sugestões do histórico de texto comum.\n- Sem `autoCorrect={false}`: o corretor ortográfico pode tentar 'corrigir' o texto digitado antes de `secureTextEntry` mascarar o campo.",
+        "ausencia_confirmada": "Busca por 'autoComplete', 'textContentType', 'autoCorrect', 'importantForAutofill' em LoginScreen.tsx: 0 ocorrências além de `autoCapitalize='none'` no campo usuário."
+      },
+      "impacto": "Baixo. secureTextEntry já impede visualização do conteúdo. O risco é que sem `textContentType='password'`, o iOS pode não reconhecer o campo como senha e pode oferecer sugestões do histórico de teclado (que é armazenado no UserDefaults). `autoCorrect` sem false pode criar entradas no dicionário personalizado do iOS a partir de fragmentos da senha.",
+      "status": "Corrigido",
+      "correcao_aplicada": "Adicionados `autoCorrect={false}`, `textContentType` e `autoComplete` em todos os campos de senha/usuário de LoginScreen, RegisterScreen e ConfiguracoesScreen. O conjunto de atributos permite que gerenciadores de senha (1Password, iCloud Keychain, Bitwarden) preencham os campos automaticamente (melhora de UX) ao mesmo tempo que previne o cache de teclado.",
+      "before": "<TextInput secureTextEntry={!senhaVisivel} value={senha} onChangeText={...} />",
+      "after": "<TextInput secureTextEntry={!senhaVisivel} autoCorrect={false} autoComplete=\"current-password\" textContentType=\"password\" value={senha} onChangeText={...} />"
+    },
+    {
+      "id": "M9-05",
+      "titulo": "Cache HTTP — sem cabeçalho Cache-Control nas respostas da API",
+      "checkpoint": "5. Cache HTTP: respostas com dados sensíveis sendo cacheadas?",
+      "cwe": "CWE-524 — Use of Cache Containing Sensitive Information",
+      "severidade": "Baixo",
+      "componentes": [
+        "AgroControl.API/Program.cs (sem ResponseCache / UseResponseCaching)",
+        "src/config/api.ts (sem cache: 'no-store' nas requisições fetch)"
+      ],
+      "evidencia": {
+        "backend": "Program.cs não configura `app.UseResponseCaching()` nem `[ResponseCache]` em nenhum controller. ASP.NET Core, por padrão, não adiciona Cache-Control nas respostas de API — o header está ausente, não setado como 'no-store'.",
+        "frontend": "api.ts usa `fetch()` nativo sem opção `cache: 'no-store'`. O iOS NSURLCache e o Android HttpResponseCache podem, em teoria, cachear respostas GET sem Cache-Control explícito.",
+        "mitigante": "Na prática, React Native fetch() em ambiente mobile não aplica cache agressivo para requisições sem headers de cache explícitos do servidor. As requisições são majoritariamente POST (mutações) que nunca são cacheadas pelo HTTP cache. As respostas GET não contêm senhas ou tokens — apenas dados de negócio que já estão no SQLite local."
+      },
+      "status": "Corrigido",
+      "correcao_aplicada": "Adicionado `Cache-Control: no-store` ao middleware de cabeçalhos de segurança existente em AgroControl.API/Program.cs. O header é aplicado a todas as respostas da API via `context.Response.Headers.Append(\"Cache-Control\", \"no-store\")`, garantindo que proxies e caches HTTP não armazenem respostas com dados de negócio sensíveis (financeiro, produção, saúde animal). Integrado ao bloco já existente de X-Content-Type-Options, X-Frame-Options e Referrer-Policy — sem impacto no comportamento do app mobile.",
+      "remediacao": "Adicionar header `Cache-Control: no-store` nas respostas do backend via middleware em Program.cs:\n```csharp\napp.Use(async (context, next) => {\n    context.Response.Headers.Append(\"Cache-Control\", \"no-store, no-cache, must-revalidate\");\n    await next();\n});\n```"
+    }
+  ],
+  "verificacoes_sem_achados": [
+    "AsyncStorage: completamente migrado para expo-secure-store (M1). Nenhuma ocorrência de `AsyncStorage.setItem` com dados sensíveis em src/.",
+    "Clipboard: nenhum uso de expo-clipboard, Clipboard.setString ou Clipboard.getString em todo src/.",
+    "Keychain/Keystore: expo-secure-store usado corretamente para SESSION_KEY e PASSWORD_HASH_KEY, com apagamento explícito em logout (deleteItemAsync em clearPersistedSession).",
+    "Shared Preferences / UserDefaults: expo-secure-store usa EncryptedSharedPreferences no Android (não SharedPreferences bruto). Nenhum acesso direto a SharedPreferences/UserDefaults encontrado.",
+    "Dados sensíveis em memória: não há persistência acidental de senha em variável global; o campo senha no React state é limpo implicitamente quando a tela é desmontada (não há persistência após navegação)."
+  ],
+  "resumo_risco": {
+    "alto": 1,
+    "medio": 1,
+    "baixo": 3
+  },
+  "correcoes_aplicadas_nesta_sessao": [
+    "M9-02: expo-file-system instalado. FileSystem.deleteAsync(uri) adicionado após compartilhamento em todos os 15 arquivos de geração de PDF.",
+    "M9-04: autoCorrect={false}, textContentType e autoComplete adicionados nos campos de senha/usuário de LoginScreen.tsx, RegisterScreen.tsx e ConfiguracoesScreen.tsx.",
+    "M9-05: Cache-Control: no-store adicionado ao middleware de cabeçalhos de segurança em AgroControl.API/Program.cs — todas as respostas da API agora incluem o header."
+  ],
+  "correcoes_pendentes": [
+    "M9-01: SQLite criptografado (SQLCipher via op-sqlite) — requer EAS Build com prebuild; incompatível com Expo Go.",
+    "M9-03: FLAG_SECURE / preventScreenCapture — requer decisão de UX sobre bloqueio de screenshots do usuário."
+  ]
+}

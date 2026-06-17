@@ -1,0 +1,209 @@
+{
+  "categoria_owasp": "M8 - Security Misconfiguration (OWASP Mobile Top 10 2024)",
+  "projeto": "AgroControl",
+  "data_analise": "2026-06-17",
+  "metodo": "Inspeção de app.json (android/ios config), appsettings.json (AllowedHosts, connection string), Program.cs (CORS, rate limiting, middleware), launchSettings.json (environment), .github/workflows/playwright.yml (CI/CD secrets), e2e/auth.spec.ts + e2e/evidencias.spec.ts (credenciais de teste), Controllers/ (decorators de autorização/rate limit), package.json (dependências de segurança). Busca por debuggable, allowBackup, RateLimit, Authorize, AllowedHosts, TrustServerCertificate, swagger.",
+  "sumario_executivo": {
+    "perfil_geral": "O app apresenta múltiplas misconfigurações de segurança distribuídas entre frontend (app.json), backend (.NET) e CI/CD (GitHub Actions). O achado mais crítico do ponto de vista operacional é a ausência total de rate limiting nos endpoints de autenticação, que permite ataques de força bruta sem nenhum obstáculo. Há também um problema regressivo de segurança no CI/CD: a correção de credenciais de teste implementada em M1 foi aplicada apenas no global setup (fixtures/auth.ts), mas dois arquivos de spec (auth.spec.ts, evidencias.spec.ts) mantêm o fallback `?? 'demo'` / `?? 'demo123'` — reconstituindo parcialmente a vulnerabilidade corrigida em M1-04.",
+    "achados_positivos": [
+      "NSAllowsArbitraryLoads (iOS): ausente — ATS padrão mantido (HTTPS obrigatório). Verificado em relatório M5.",
+      "android:usesCleartextTraffic: não configurado como true — herda proteção padrão do Android (targetSdkVersion 35). Verificado em M5.",
+      "Swagger/OpenAPI UI: não instalado — nenhuma rota /swagger exposta. Busca por UseSwagger/AddSwagger no projeto: 0 ocorrências.",
+      "Firebase: ausente — nenhuma regra permissiva de Firestore/RTDB para analisar.",
+      "Source maps via Metro: não expostos publicamente — configuração padrão Expo não serve source maps em produção."
+    ]
+  },
+  "achados": [
+    {
+      "id": "M8-01",
+      "titulo": "android:allowBackup não configurado explicitamente — padrão pode variar por vendor",
+      "checkpoint": "1. AndroidManifest.xml: android:allowBackup?",
+      "cwe": "CWE-276 — Incorrect Default Permissions",
+      "severidade": "Médio",
+      "componente": "app.json (bloco android — sem chave allowBackup)",
+      "evidencia": {
+        "app_json_android": "\"android\": { \"icon\": \"...\", \"adaptiveIcon\": {...}, \"predictiveBackGestureEnabled\": false, \"package\": \"com.anonymous.AgroControl\", \"jsEngine\": \"hermes\", \"newArchEnabled\": false, \"softwareKeyboardLayoutMode\": \"pan\", \"enableProguardInReleaseBuilds\": true, \"enableShrinkResourcesInReleaseBuilds\": true } — sem chave \"allowBackup\".",
+        "comportamento_padrao": "Sem configuração explícita, o Expo gera `android:allowBackup=\"true\"` no AndroidManifest.xml (comportamento padrão do Android para apps que não declaram a chave). Com allowBackup=true, o Android Backup Service (e backups ADB: `adb backup -apk com.anonymous.AgroControl`) podem copiar dados do app — incluindo o banco SQLite local (20 tabelas financeiras/saúde) — para o Google Drive do usuário (não criptografado end-to-end em Android < 9) ou para o PC via USB.",
+        "risco_cruzado": "Amplifica M6-04 (SQLite sem criptografia): se allowBackup=true, os dados do banco ficam acessíveis sem root via backup ADB simples (`adb backup`) em dispositivos com debugging habilitado, ou via Google Drive em qualquer dispositivo."
+      },
+      "impacto": "Um atacante com acesso físico temporário ao dispositivo e USB debugging habilitado pode extrair o backup completo do app em < 2 minutos com `adb backup -noapk com.anonymous.AgroControl -f backup.ab` e então analisar com Android Backup Extractor (ABE) para obter o banco SQLite completo.",
+      "cadeia_ataque": "Dispositivo com USB debugging ativo → `adb backup -noapk ... -f dump.ab` → ABE converter → sqlite3 dump.db → acesso total a todas as tabelas financeiras, produtividade e saúde animal.",
+      "esforco_ataque": "5-10 minutos com ferramentas padrão.",
+      "status": "Corrigido",
+      "correcao_aplicada": "Adicionado `\"allowBackup\": false` no bloco `android` de app.json. O Expo mapeia esta chave diretamente para `android:allowBackup` no AndroidManifest.xml gerado.",
+      "before": "\"android\": { \"jsEngine\": \"hermes\", ... \"enableProguardInReleaseBuilds\": true }",
+      "after": "\"android\": { \"allowBackup\": false, \"jsEngine\": \"hermes\", ... \"enableProguardInReleaseBuilds\": true }"
+    },
+    {
+      "id": "M8-02",
+      "titulo": "Info.plist / ATS — sem misconfigurações (verificação negativa)",
+      "checkpoint": "2. Info.plist: configurações de exceções ATS? NSAllowsArbitraryLoads?",
+      "cwe": "N/A",
+      "severidade": "Informativo",
+      "evidencia": "Nenhuma entrada `ios.infoPlist.NSAppTransportSecurity.NSAllowsArbitraryLoads` em app.json. O app herda o ATS padrão iOS (HTTPS com TLS 1.2+ obrigatório). Hermes habilitado para iOS após M7-01. Documentado extensamente em M5.",
+      "status": "Sem achado — configuração segura"
+    },
+    {
+      "id": "M8-03",
+      "titulo": "__DEV__ em produção — uso legítimo, sem misconfigurações",
+      "checkpoint": "3. React Native: __DEV__ usado em código de produção? Console.log ativo?",
+      "cwe": "N/A",
+      "severidade": "Informativo",
+      "evidencia": {
+        "dev_flag": "src/config/api.ts:4 — `export const API_URL = __DEV__ ? DEV_URL : PROD_URL;` — uso explicitamente intencional para seleção de ambiente. Não expõe informações sensíveis em produção (apenas seleciona a URL, que está hardcoded de qualquer modo — ver M7-09).",
+        "console_logs": "Corrigido em M7-05 via babel-plugin-transform-remove-console: todas as chamadas console.* são removidas automaticamente em builds de produção (NODE_ENV=production). Sem console logs ativos em produção."
+      },
+      "status": "Sem achado — M7-05 já corrigiu o console logging"
+    },
+    {
+      "id": "M8-04",
+      "titulo": "Metro bundler — sem misconfigurações (verificação negativa)",
+      "checkpoint": "4. Metro bundler: configurações expostas? Source maps acessíveis?",
+      "cwe": "N/A",
+      "severidade": "Informativo",
+      "evidencia": "metro.config.js contém apenas um resolveRequest customizado para leaflet/expo-sqlite — sem configuração de publicação de source maps, sem devServer exposto em produção. EAS Build não serve source maps publicamente. Source maps são gerados localmente e ficam nos artefatos de build do EAS (acesso restrito à conta do projeto).",
+      "status": "Sem achado — configuração segura"
+    },
+    {
+      "id": "M8-05",
+      "titulo": "Firebase — não utilizado (verificação negativa)",
+      "checkpoint": "5. Firebase: regras do Firestore/RTDB permissivas?",
+      "cwe": "N/A",
+      "severidade": "Informativo",
+      "evidencia": "Busca por 'firebase', 'firestore', 'realtime-database', '@firebase' em package.json e src/: 0 ocorrências. O app não usa Firebase ou qualquer BaaS de terceiros.",
+      "status": "Não aplicável"
+    },
+    {
+      "id": "M8-06",
+      "titulo": "Expo OTA updates — não configurado (ausência de risco, mas sem mecanismo de hotfix)",
+      "checkpoint": "6. Expo: OTA updates sem validação de integridade? Canal de produção configurado?",
+      "cwe": "CWE-494 — Download of Code Without Integrity Check (potencial, se OTA implementado no futuro)",
+      "severidade": "Baixo",
+      "componente": "package.json (expo-updates ausente), eas.json (sem canal de updates), app.json (sem chave updates)",
+      "evidencia": {
+        "expo_updates": "expo-updates não está listado em package.json. Sem OTA updates configurados, não há risco de updates sem validação de integridade.",
+        "eas_json_producao": "Após correção M7-06, eas.json agora tem perfil production com distribution:store — o mecanismo de atualização padrão será via lojas (Play Store / App Store), que impõem verificação de assinatura. Isso é mais seguro do que OTA sem code signing."
+      },
+      "impacto": "Não há risco atual de OTA sem integridade. O risco FUTURO surge se expo-updates for adicionado sem configurar code signing.",
+      "status": "Monitoramento",
+      "correcao_aplicada": null,
+      "remediacao": "Se expo-updates for adicionado no futuro: executar `eas update:configure --code-signing` ANTES de habilitar channels de produção. Documentar como pre-requisito de conformidade de segurança."
+    },
+    {
+      "id": "M8-07",
+      "titulo": "CI/CD: playwright.yml sem injeção de secrets + fallback demo credentials em 2 specs",
+      "checkpoint": "7. CI/CD: secrets expostos em logs de build? Variáveis de ambiente no APK/IPA?",
+      "cwe": "CWE-798 — Use of Hard-coded Credentials",
+      "severidade": "Alto",
+      "componentes": [
+        ".github/workflows/playwright.yml (sem env: com secrets)",
+        "e2e/auth.spec.ts:14-15 (fallback ?? 'demo' / ?? 'demo123')",
+        "e2e/evidencias.spec.ts:80-81 (fallback ?? 'demo' / ?? 'demo123')"
+      ],
+      "evidencia": {
+        "playwright_yml": "O step 'Run Playwright tests' em .github/workflows/playwright.yml não define nenhum bloco `env:` com variáveis de ambiente. Resultado: em CI, TEST_USER e TEST_PASS estão undefined.",
+        "auth_spec_ts": "e2e/auth.spec.ts:14-15:\n  const USER = process.env.TEST_USER ?? 'demo';\n  const PASS = process.env.TEST_PASS ?? 'demo123';\nEm CI com TEST_USER/TEST_PASS ausentes → USER='demo', PASS='demo123'.",
+        "evidencias_spec_ts": "e2e/evidencias.spec.ts:80-81:\n  const user = process.env.TEST_USER ?? 'demo';\n  const pass = process.env.TEST_PASS ?? 'demo123';\nMesmo padrão.",
+        "regressao_m1": "A correção M1-04 aplicada em e2e/fixtures/auth.ts removeu o fallback e adicionou throw new Error() quando as variáveis não estão definidas. Porém auth.spec.ts e evidencias.spec.ts NÃO foram atualizados, recriando parcialmente o problema: em CI, os 2 arquivos de spec usam credenciais 'demo'/'demo123' hardcoded enquanto o global setup (fixtures/auth.ts) lança erro."
+      },
+      "impacto": "Em CI: o global setup lança erro → testes globais falham, mas auth.spec.ts e evidencias.spec.ts (que não usam o global setup por design — usam storageState vazio) conseguem rodar com credenciais 'demo'/'demo123'. Se um usuário 'demo' existir no banco de testes, esses testes passam silenciosamente com credenciais codificadas. Qualquer pessoa com acesso ao repositório sabe que 'demo'/'demo123' é uma credencial funcional de teste.",
+      "status": "Corrigido",
+      "correcao_aplicada": "1) playwright.yml atualizado: adicionado bloco `env:` no step 'Run Playwright tests' injetando TEST_USER e TEST_PASS de GitHub Secrets (${{ secrets.TEST_USER }} / ${{ secrets.TEST_PASS }}). 2) auth.spec.ts: removido fallback ?? 'demo' / ?? 'demo123' — variáveis obrigatórias com throw se ausentes, espelhando o padrão de fixtures/auth.ts. 3) evidencias.spec.ts: mesmo tratamento.",
+      "before": "const USER = process.env.TEST_USER ?? 'demo';\nconst PASS = process.env.TEST_PASS ?? 'demo123';",
+      "after": "const USER = process.env.TEST_USER;\nconst PASS = process.env.TEST_PASS;\nif (!USER || !PASS) throw new Error('TEST_USER e TEST_PASS são obrigatórios (OWASP M1/M8).');"
+    },
+    {
+      "id": "M8-08",
+      "titulo": "CORS AllowAnyOrigin() no backend — misconfigurações já documentadas em M3/M5",
+      "checkpoint": "8. Configurações de CORS no backend: muito permissivas para o app mobile?",
+      "cwe": "CWE-942 — Permissive Cross-domain Policy with Untrusted Domains",
+      "severidade": "Médio",
+      "componente": "AgroControl.API/Program.cs:46-54",
+      "evidencia": "policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader(); — ver relatório M3 (M3-07) e M5 para análise completa. Reproduzido aqui por completude do M8.",
+      "impacto": "Qualquer origem web pode fazer requisições autenticadas à API usando credenciais do usuário logado no navegador. Em prática atual (sem JWT, autenticação por ID enviado no body), o CORS permissivo amplifica o risco de CSRF/request forgery.",
+      "status": "Pendente — explicitamente adiado pelo usuário ('por enquanto não vamos fazer nenhum ajuste do M3'). Ver M3-07 para plano de correção.",
+      "correcao_aplicada": null,
+      "remediacao": "Ver M3-07: restringir para `.WithOrigins('https://seudominio.com')` quando o domínio de produção for estabilizado."
+    },
+    {
+      "id": "M8-09",
+      "titulo": "Sem rate limiting em /api/auth/login e /api/auth/register — força bruta irrestrita",
+      "checkpoint": "9. Rate limiting nas APIs: configurado para endpoints de autenticação?",
+      "cwe": "CWE-799 — Improper Control of Interaction Frequency",
+      "severidade": "Alto",
+      "componentes": [
+        "AgroControl.API/Program.cs (sem AddRateLimiter / UseRateLimiter)",
+        "AgroControl.API/Controllers/AuthController.cs (sem [EnableRateLimiting])"
+      ],
+      "evidencia": {
+        "busca_rate_limit": "Busca por 'RateLimit', 'throttl', 'AspNetCoreRateLimit', 'AddRateLimiter', 'RequireRateLimiting' em AgroControl.API/: 0 ocorrências.",
+        "endpoints_expostos": "POST /api/auth/login — aceita número ilimitado de requisições por IP/segundo sem qualquer penalidade.\nPOST /api/auth/register — sem limite: permite criação de contas em massa automatizada.",
+        "sem_lockout": "AuthController.cs e AuthService.cs não implementam nenhum mecanismo de account lockout após N tentativas falhas — verificado pelo código completo de LoginAsync.",
+        "contramedida_bcrypt": "BCrypt.Verify (usado em M1) tem custo de ~100ms por verificação — isso naturalmente limita a velocidade do atacante para ~10 tentativas/seg por thread no servidor. Porém sem rate limiting, um atacante pode lançar ataques paralelos em múltiplas threads/IPs."
+      },
+      "impacto": "Ataque de força bruta contra /api/auth/login: sem rate limiting e sem lockout, um atacante pode tentar senhas em velocidade limitada apenas pela latência da rede e custo do BCrypt. Para senhas fracas (ex.: 4 dígitos numéricos = 10.000 combinações), o ataque completa em minutos. Para o /api/auth/register: possível criação de contas spam em massa consumindo recursos do banco de dados.",
+      "cadeia_ataque": "Conhecer username alvo (enumeração de usuários simplificada por respostas diferentes do login: 'Usuário não encontrado' vs 'Senha incorreta') → script de força bruta → senha descoberta → acesso completo à conta incluindo dados financeiros e de produção.",
+      "status": "Corrigido",
+      "correcao_aplicada": "Adicionado rate limiting nativo do ASP.NET Core (.NET 7+ `Microsoft.AspNetCore.RateLimiting`) em Program.cs: política 'auth' com janela fixa de 10 requisições/minuto por IP para endpoints de autenticação. `[EnableRateLimiting(\"auth\")]` adicionado em AuthController.cs. Resposta HTTP 429 com Retry-After header automático.",
+      "before": {
+        "Program.cs": "// sem rate limiting\napp.UseCors(\"AllowAll\");\napp.UseAuthorization();\napp.MapControllers();",
+        "AuthController.cs": "[ApiController]\n[Route(\"api/auth\")]\npublic class AuthController(...) : ControllerBase"
+      },
+      "after": {
+        "Program.cs": "builder.Services.AddRateLimiter(...);\n// ...\napp.UseRateLimiter();\napp.UseCors(\"AllowAll\");\napp.UseAuthorization();\napp.MapControllers();",
+        "AuthController.cs": "[ApiController]\n[Route(\"api/auth\")]\n[EnableRateLimiting(\"auth\")]\npublic class AuthController(...) : ControllerBase"
+      }
+    },
+    {
+      "id": "M8-10",
+      "titulo": "AllowedHosts: \"*\" no appsettings.json — sem filtro de Host header",
+      "checkpoint": "Achado adicional — configuração de hospedagem do backend",
+      "cwe": "CWE-290 — Authentication Bypass by Spoofing",
+      "severidade": "Baixo",
+      "componente": "AgroControl.API/appsettings.json:8",
+      "evidencia": "\"AllowedHosts\": \"*\" — o middleware AllowedHosts do ASP.NET Core (ativo por padrão) está configurado para aceitar qualquer valor de Host header, sem validação.",
+      "impacto": "Host header injection: em proxies reversos mal configurados, o Host header pode ser manipulado para afetar geração de URLs absolutas (links de e-mail de reset de senha, por exemplo). Neste app, sem geração de links absolutos e sem proxy reverso configurado, o impacto é baixo. Relevante apenas quando o app for deployado com proxy reverso em produção.",
+      "status": "Pendente — requer conhecimento do domínio de produção (ainda ngrok rotativo) para configurar corretamente. Documentado para correção junto com M2-12 (estabilização de domínio).",
+      "correcao_aplicada": null,
+      "remediacao": {
+        "before": "\"AllowedHosts\": \"*\"",
+        "after": "\"AllowedHosts\": \"api.seudominio.com;localhost\""
+      }
+    },
+    {
+      "id": "M8-11",
+      "titulo": "TrustServerCertificate=True na connection string — sem validação de certificado do SQL Server",
+      "checkpoint": "Achado adicional — configuração de banco de dados backend",
+      "cwe": "CWE-295 — Improper Certificate Validation",
+      "severidade": "Baixo",
+      "componente": "AgroControl.API/appsettings.json:10",
+      "evidencia": "\"DefaultConnection\": \"Server=(localdb)\\\\MSSQLLocalDB;...;TrustServerCertificate=True;\" — o cliente SQL usa LocalDB (processo local, sem rede) em desenvolvimento. TrustServerCertificate=True é necessário para LocalDB pois usa um certificado auto-assinado.",
+      "impacto": "No ambiente de desenvolvimento (LocalDB), não há impacto real pois a conexão é local. O risco surge se a mesma connection string for usada em produção com um SQL Server remoto — neste caso TrustServerCertificate=True desabilita a validação do certificado TLS do servidor de banco, permitindo MITM na conexão backend↔DB.",
+      "status": "Pendente — requer separação explícita de appsettings entre desenvolvimento e produção. Documentado para correção na fase de deployment.",
+      "correcao_aplicada": null,
+      "remediacao": {
+        "descricao": "Criar appsettings.Production.json com connection string sem TrustServerCertificate (usando certificado válido no servidor de produção):\n```json\n{\n  \"ConnectionStrings\": {\n    \"DefaultConnection\": \"Server=prod-server;Database=AgroControl;User Id=...;Password=...;\"\n  },\n  \"AllowedHosts\": \"api.seudominio.com\"\n}\n```\nManter TrustServerCertificate=True apenas no appsettings.json (desenvolvimento/LocalDB)."
+      }
+    }
+  ],
+  "resumo_risco": {
+    "alto": 2,
+    "medio": 1,
+    "baixo": 3,
+    "informativo": 4,
+    "nao_aplicavel": 1
+  },
+  "correcoes_aplicadas_nesta_sessao": [
+    "M8-01: app.json — android.allowBackup definido como false (previne backup ADB/Google Drive do SQLite)",
+    "M8-07: .github/workflows/playwright.yml — injeção de TEST_USER/TEST_PASS via GitHub Secrets no step de teste E2E",
+    "M8-07: e2e/auth.spec.ts — removido fallback ?? 'demo' / ?? 'demo123' (regressão M1-04 corrigida)",
+    "M8-07: e2e/evidencias.spec.ts — removido fallback ?? 'demo' / ?? 'demo123' (regressão M1-04 corrigida)",
+    "M8-09: AgroControl.API/Program.cs — AddRateLimiter com política 'auth' (10 req/min por IP) + UseRateLimiter()",
+    "M8-09: AgroControl.API/Controllers/AuthController.cs — [EnableRateLimiting(\"auth\")] adicionado na classe"
+  ],
+  "correcoes_pendentes": [
+    "M8-08: CORS AllowAnyOrigin() — explicitamente adiado (aguarda M3 e domínio de produção)",
+    "M8-10: AllowedHosts: \"*\" — requer domínio de produção estável (bloqueado por M2-12)",
+    "M8-11: TrustServerCertificate=True — requer separação de appsettings de produção na fase de deployment"
+  ]
+}

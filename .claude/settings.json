@@ -18,7 +18,24 @@
       "Read(//c/Users/arthu/AppData/Local/Temp/claude/c--Users-arthu-AgroControl/e8494ece-4ec1-4e84-998b-a8be3d2f216f/tasks/**)",
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\arthu\\\\AgroControl\" -Recurse -Force)",
       "Bash(Select-Object -First 50)",
-      "Bash(Format-List FullName)"
+      "Bash(Format-List FullName)",
+      "Bash(node -e ' *)",
+      "Bash(npm audit *)",
+      "Bash(rm -f audit_tmp.json)",
+      "Bash(npm ls *)",
+      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('docs/security/owasp-m2-relatorio.json','utf8'\\)\\); console.log\\('JSON válido'\\)\")",
+      "Bash(cp package.json package.json.bak)",
+      "Bash(cp package-lock.json package-lock.json.bak)",
+      "Bash(rm -f audit_after.json)",
+      "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\);process.stdin.on\\('end',\\(\\)=>{const v=JSON.parse\\(d\\); console.log\\(v.filter\\(x=>x.startsWith\\('0.'\\)\\).slice\\(-5\\)\\)}\\)\")",
+      "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\);process.stdin.on\\('end',\\(\\)=>{const a=JSON.parse\\(d\\); console.log\\(JSON.stringify\\(a.metadata.vulnerabilities\\)\\); console.log\\('json-server in vulns?', !!a.vulnerabilities['json-server']\\);}\\)\")",
+      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('docs/security/owasp-m3-relatorio.json','utf8'\\)\\); console.log\\('JSON válido'\\)\")",
+      "Bash(grep -rn \"FromSqlRaw\\\\|ExecuteSqlRaw\\\\|FromSqlInterpolated\\\\|SqlCommand\\\\|string.Format.*SELECT\\\\|\\\\\\\\+ \\\\\"WHERE\" --include=\"*.cs\" .)",
+      "Bash(grep -E \"\\\\+\\\\\\)|\\\\*\\\\\\)|\\\\{[0-9]+,\\\\}\")",
+      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('docs/security/owasp-m4-relatorio.json','utf8'\\)\\); console.log\\('JSON válido'\\)\")",
+      "Bash(grep -n '\\\\${info\\\\.\\\\|\\\\${responsavelFinal}\\\\|\\\\${r\\\\?\\\\.\\\\|\\\\${r\\\\.acoes' src/utils/pdf/pdfPotabilidade.ts src/utils/pdf/pdfProducaoDiaria.ts)",
+      "Bash(taskkill //F //PID 11188)",
+      "Bash(grep -rn \"WebSocket\\\\|new WebSocket\\\\|ws://\\\\|wss://\" --include=\"*.ts*\" src)"
     ],
     "additionalDirectories": [
       "c:\\Users\\arthu\\.claude\\projects\\c--Users-arthu-AgroControl\\memory"

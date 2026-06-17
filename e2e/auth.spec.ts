@@ -11,8 +11,11 @@ import { test, expect } from '@playwright/test';
 // Sobrescreve storageState para iniciar sem sessão
 test.use({ storageState: { cookies: [], origins: [] } });
 
-const USER = process.env.TEST_USER ?? 'demo';
-const PASS = process.env.TEST_PASS ?? 'demo123';
+const USER = process.env.TEST_USER;
+const PASS = process.env.TEST_PASS;
+if (!USER || !PASS) {
+  throw new Error('TEST_USER e TEST_PASS são obrigatórios (OWASP M1/M8). Defina via variáveis de ambiente.');
+}
 
 test.describe('Login', () => {
   test.beforeEach(async ({ page }) => {

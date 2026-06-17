@@ -10,11 +10,21 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
+import { z } from 'zod';
 import { RootStackParamList, AnimalParams } from '../types/navigation';
 import { api, ApiError } from '../config/api';
 import { getSession } from '../services/session';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { saveAnimalLocalPending, addToSyncQueue } from '../database/localDb';
+
+// [OWASP M4-02] Mesmo limite usado em CadastrarAnimalFotoDto.FotoBase64
+// (backend) — falha rápido no cliente antes de gastar banda enviando uma
+// foto que o servidor rejeitaria.
+const FOTO_BASE64_MAX_CHARS = 12_000_000;
+const fotoBase64Schema = z.string().max(
+  FOTO_BASE64_MAX_CHARS,
+  'Foto muito grande. Tente novamente com uma foto de menor resolução.'
+);
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'CadastroAnimal'>;
@@ -333,7 +343,13 @@ export default function CadastroAnimalScreen({ navigation, route }: Props) {
       return;
     }
 
-    const base64 = asset.base64;
+    const validacao = fotoBase64Schema.safeParse(asset.base64);
+    if (!validacao.success) {
+      mostrarAviso('erro', validacao.error.issues[0]?.message ?? 'Foto inválida.');
+      return;
+    }
+
+    const base64 = validacao.data;
     setFotos(prev => [...prev, { uri: asset.uri, base64 }].slice(0, 3));
   }
 

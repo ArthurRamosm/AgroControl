@@ -1,0 +1,243 @@
+{
+  "categoria_owasp": "M7 - Insufficient Binary Protections (OWASP Mobile Top 10 2024)",
+  "projeto": "AgroControl",
+  "data_analise": "2026-06-17",
+  "metodo": "Inspeção de app.json (jsEngine, ProGuard, shrinkResources), eas.json (perfis de build), babel.config.js (plugins de ofuscação), metro.config.js (minificação/transformadores), package.json (bibliotecas de detecção de root/emulador/tampering), src/config/api.ts (URL hardcoded, uso de __DEV__), e busca por padrões console.*, jailbreak, emulator, root detection em todo src/.",
+  "sumario_executivo": {
+    "perfil_geral": "O app apresenta múltiplas proteções binárias ausentes ou explicitamente desabilitadas: ProGuard/R8 está DESATIVADO em app.json, não existe perfil 'production' em eas.json (apenas 'development' e 'preview'), não há detecção de root/jailbreak, nem de emulador, nem anti-tampering. O único controle de proteção binária ativo é o Hermes bytecode no Android — que é uma compilação, não uma ofuscação, mas eleva moderadamente a barreira de análise.",
+    "achado_mais_critico": "M7-07 — ProGuard/R8 explicitamente desabilitado (`enableProguardInReleaseBuilds: false`) combinado com M7-06 (ausência de perfil 'production' em eas.json). Isso garante que mesmo builds de 'release' gerados via EAS não aplicam minificação ou ofuscação nas camadas nativas Java/Kotlin, deixando os nomes de classes, métodos e a estrutura interna dos wrappers de módulos nativos completamente legíveis via `jadx` ou `apktool` em menos de 10 minutos.",
+    "contraponto": "O risco de M7 para este app é contextualizado: AgroControl não contém lógica de DRM, licenciamento, algoritmos de trading ou dados de cartão de crédito. O segredo de maior valor exposto pela engenharia reversa é a PROD_URL do backend (ngrok) hardcoded em api.ts — mas essa URL já é transmitida em texto claro nas requisições HTTP e rotaciona quando o túnel ngrok é reiniciado. O risco de negócio real é: (a) leitura do DB SQLite local em dispositivos com root (amplifica M6-04), e (b) adulteração do bundle JS para injetar código malicioso em builds distribuídos internamente."
+  },
+  "achados": [
+    {
+      "id": "M7-01",
+      "titulo": "Sem ofuscação de JavaScript — Hermes apenas no Android",
+      "checkpoint": "1. Ofuscação de código: JavaScript bundle obfuscado? Hermes bytecode em uso?",
+      "severidade": "Médio",
+      "componentes": [
+        "babel.config.js (sem plugin de ofuscação)",
+        "metro.config.js (sem transformer customizado)",
+        "app.json:26 (jsEngine: hermes — apenas para Android)",
+        "app.json (sem jsEngine configurado para iOS)"
+      ],
+      "evidencia": {
+        "babel_config": "module.exports = function (api) { api.cache(true); return { presets: ['babel-preset-expo'] }; }; — sem babel-plugin-obfuscator, nem javascript-obfuscator, nem qualquer plugin de code splitting agressivo.",
+        "metro_config": "getDefaultConfig(__dirname) com apenas um resolveRequest para leaflet/expo-sqlite — sem serializador customizado, sem minifyerPath personalizado.",
+        "hermes_android": "app.json:26 — \"jsEngine\": \"hermes\" declarado apenas dentro do bloco \"android\". O Hermes compila TypeScript/JavaScript para bytecode HBC (Hermes Bytecode), tornando o bundle Android não legível como texto puro — mas isso é uma COMPILAÇÃO, não ofuscação: nomes de funções e strings permanecem extraíveis com hermes-dec ou hbctool.",
+        "ios_sem_hermes": "No bloco \"ios\" de app.json não há \"jsEngine\": \"hermes\" declarado. Para iOS, o Metro bundler produz um arquivo main.jsbundle em JavaScript minificado (mas não compilado para bytecode), legível com qualquer editor de texto após extração do .ipa."
+      },
+      "causa_raiz": "O projeto usa apenas a configuração padrão do Expo (babel-preset-expo + Metro defaults). A ofuscação de JS não é habilitada por padrão no Expo Managed Workflow — requer instalação e configuração explícita de um plugin de ofuscação.",
+      "cenario_ataque": "Android: atacante extrai o .apk → descompacta (unzip) → localiza assets/index.android.bundle → executa hbctool/hermes-dec para descompilar o bytecode HBC → obtém código JS semi-legível com nomes de variáveis preservados e todas as strings (incluindo PROD_URL do ngrok) visíveis. iOS: extrai .ipa → obtém main.jsbundle em JS minificado mas legível → prettier/js-beautify formata → código-fonte parcialmente recuperado em ~30 minutos.",
+      "esforco_ataque": "Android: 2-4 horas (descompilação HBC + análise). iOS: 30-60 minutos (bundle JS texto puro + beautifier).",
+      "risco_negocio": "Baixo-Médio. Exposição de: PROD_URL hardcoded (api.ts:2), estrutura completa de endpoints da API, esquema de DTOs, lógica de validação cliente. Para este app (sem DRM, sem IP crítico), o impacto é principalmente a facilitação de ataques à API por conhecimento dos endpoints exatos.",
+      "status": "Pendente de correção",
+      "correcao_aplicada": null,
+      "remediacao": {
+        "imediata": "Habilitar Hermes para iOS também em app.json (já que Expo SDK 54 suporta Hermes em iOS): \"ios\": { ..., \"jsEngine\": \"hermes\" }. Isso aplica compilação para bytecode HBC também no iOS.",
+        "recomendada": "Para ofuscação real de nomes de variáveis/funções, instalar e configurar `babel-plugin-obfuscator` (wrapper do `javascript-obfuscator`) no babel.config.js apenas para builds de release:\n```js\nmodule.exports = function (api) {\n  api.cache(true);\n  const isProduction = process.env.NODE_ENV === 'production';\n  return {\n    presets: ['babel-preset-expo'],\n    plugins: isProduction ? [['babel-plugin-obfuscator', {\n      rotateStringArray: true, stringArray: true, stringArrayThreshold: 0.8,\n      compact: true, controlFlowFlattening: false\n    }]] : []\n  };\n};\n```\n⚠️ Atenção: `controlFlowFlattening: true` aumenta o tamanho do bundle em 50-200% e pode degradar performance em dispositivos mais antigos — manter `false`.",
+        "motivo_nao_aplicado": "A opção imediata (Hermes no iOS) é segura e aplicada abaixo (M7-01-fix). O plugin de ofuscação JS não é aplicado agora pois requer EAS Build para validação completa e pode impactar performance em dispositivos de baixo custo — é uma decisão de trade-off build/performance que o usuário deve validar em build de release antes de habilitar."
+      }
+    },
+    {
+      "id": "M7-02",
+      "titulo": "Sem detecção de root/jailbreak",
+      "checkpoint": "2. Detecção de root/jailbreak: implementada via react-native-device-info ou library dedicada?",
+      "severidade": "Alto",
+      "componentes": [
+        "package.json (ausência de react-native-device-info, expo-device para detecção)",
+        "src/ (ausência de qualquer chamada isRooted/isJailbroken)"
+      ],
+      "evidencia": {
+        "package_json": "Busca por 'react-native-device-info', 'jailbreak', 'root', 'expo-device' em package.json: 0 ocorrências. Nenhuma biblioteca de detecção de root ou jailbreak instalada.",
+        "src_grep": "Busca por 'jailbreak', 'rootCheck', 'isRooted', 'isJailbroken' em src/: 0 ocorrências. Nenhuma verificação em runtime.",
+        "impacto_m6": "Em dispositivo com root (Android) ou jailbreak (iOS), o sandbox de armazenamento do app é removido: atacante com acesso físico ao dispositivo pode ler diretamente o banco SQLite (src/database/localDb.ts — ~20 tabelas financeiras e de saúde animal) e o SecureStore (ainda criptografado pelo Keystore, mas a chave pode ser extraída em dispositivos com root via Frida)."
+      },
+      "causa_raiz": "Funcionalidade não implementada. A detecção de root/jailbreak não é fornecida automaticamente pelo Expo Managed Workflow.",
+      "cenario_ataque": "Atacante instala o app em Android com root → acessa /data/data/com.anonymous.AgroControl/databases/agrocontrol.db com sqlite3 → lê todas as tabelas financeiras, de produção e saúde animal sem nenhum obstáculo adicional. Em combinação com M6-04 (banco não criptografado), o acesso é imediato e trivial.",
+      "esforco_ataque": "5-15 minutos com dispositivo root e adb shell.",
+      "risco_negocio": "Alto. Dados financeiros completos (receitas, despesas, produção) de toda a propriedade rural ficam expostos com acesso físico ao dispositivo.",
+      "status": "Pendente de correção",
+      "correcao_aplicada": null,
+      "remediacao": {
+        "biblioteca": "Instalar `expo-device` (já parte do ecossistema Expo, requer apenas import) ou `react-native-device-info` para detecção mais abrangente.",
+        "implementacao": "```typescript\n// src/utils/deviceSecurity.ts\nimport * as Device from 'expo-device';\n\nexport async function verificarSegurancaDispositivo(): Promise<{ seguro: boolean; motivo?: string }> {\n  if (!Device.isDevice) {\n    // Emulador/simulador — ver M7-03\n    if (__DEV__) return { seguro: true }; // permitir em dev\n    return { seguro: false, motivo: 'App não pode rodar em emuladores.' };\n  }\n  // expo-device não expõe isRooted diretamente;\n  // para verificação mais robusta, usar react-native-device-info:\n  // const isRooted = await DeviceInfo.isRooted();\n  return { seguro: true };\n}\n```\nChamar em AppNavigator.tsx no mount, bloquear navegação se `!seguro`.",
+        "motivo_nao_aplicado": "Detecção de root via `expo-device` (Device.isDevice) apenas distingue dispositivo físico de emulador — não detecta root. A detecção robusta de root/jailbreak requer `react-native-device-info`, que não está instalado. A instalação requer EAS Build (não funciona em Expo Go) e potencial prebuild de dependências nativas. Documentado para implementação no próximo ciclo de build de produção."
+      }
+    },
+    {
+      "id": "M7-03",
+      "titulo": "Sem detecção de emulador",
+      "checkpoint": "3. Detecção de emulador: app bloqueia execução em emuladores?",
+      "severidade": "Baixo",
+      "componentes": [
+        "src/ (ausência de verificação Device.isDevice ou equivalente)"
+      ],
+      "evidencia": {
+        "package_json": "expo-device não está instalado (apenas 'expo' base, que inclui Device via expo-modules mas sem import ativo no projeto). Busca por 'isDevice', 'isEmulator', 'isVirtualDevice' em src/: 0 ocorrências.",
+        "contexto": "A ausência de detecção de emulador é relevante principalmente quando combinada com root detection (M7-02) — em emuladores o atacante tem acesso root por padrão, facilitando análise dinâmica com Frida para hooking de funções de autenticação."
+      },
+      "causa_raiz": "Funcionalidade não implementada. O Expo Managed Workflow não provê detecção de emulador automaticamente.",
+      "cenario_ataque": "Pesquisador de segurança (ou atacante) instala o app no Android Emulator com root padrão → usa Frida para hookear a função `hashSenha` em session.ts em runtime → intercepta credenciais antes da hash → ou hookear `verifyPasswordOffline` para sempre retornar `true`.",
+      "esforco_ataque": "2-6 horas para analista com experiência em Frida e React Native.",
+      "risco_negocio": "Médio. Principalmente facilita análise de segurança dinâmica — não expõe dados diretamente mas pode ser usado para bypass de autenticação em contexto de pesquisa/ataque direcionado.",
+      "status": "Pendente de correção",
+      "correcao_aplicada": null,
+      "remediacao": {
+        "implementacao": "```typescript\nimport * as Device from 'expo-device';\n// Em AppNavigator.tsx ou app startup:\nif (!Device.isDevice && !__DEV__) {\n  // Bloquear UI com mensagem de erro\n}\n```\n`Device.isDevice` retorna `false` em emuladores/simuladores — implementação simples via `expo-device` que já está disponível como módulo Expo sem instalação adicional.",
+        "motivo_nao_aplicado": "A correção foi agrupada com M7-02 (root detection) por requerem a mesma função de verificação centralizada. Documentado para implementação em conjunto."
+      }
+    },
+    {
+      "id": "M7-04",
+      "titulo": "Sem verificação de integridade do bundle (anti-tampering)",
+      "checkpoint": "4. Anti-tampering: integridade do bundle verificada em runtime?",
+      "severidade": "Médio",
+      "componentes": [
+        "eas.json (sem perfil production com code signing)",
+        "package.json (sem expo-updates com code signing)"
+      ],
+      "evidencia": {
+        "eas_json": "eas.json contém apenas perfis 'development' e 'preview' — sem perfil 'production'. Sem code signing de updates configurado.",
+        "expo_updates": "expo-updates não está instalado/configurado para verificação criptográfica de integridade de bundle. O app usa distribuição interna (distribution: 'internal') sem assinatura de código de updates.",
+        "distribuicao": "Ambos os perfis em eas.json usam `distribution: 'internal'` — distribuição fora da Google Play/App Store, o que remove as proteções de integridade impostas pelas lojas (verificação de assinatura do APK na Play, notarização no iOS)."
+      },
+      "causa_raiz": "O app está sendo distribuído como build interno (APK direto) sem o benefício das verificações de integridade das lojas de aplicativos, e sem mecanismo alternativo de verificação.",
+      "cenario_ataque": "Atacante obtém o APK de build interno → repackageia com código malicioso injetado (ex.: exfiltração de credenciais para servidor externo) → redistribui via grupo de WhatsApp/Telegram se passando pela versão oficial → usuários instalam versão adulterada sem perceber.",
+      "esforco_ataque": "3-8 horas para criar um APK adulterado convincente. Distribuição depende de engenharia social.",
+      "risco_negocio": "Médio. Risco realizado apenas se atacante conseguir redistribuir APK adulterado para usuários reais — mais provável em contexto de distribuição interna sem controle de versão centralizado.",
+      "status": "Pendente de correção",
+      "correcao_aplicada": null,
+      "remediacao": {
+        "imediata": "Adicionar perfil 'production' no eas.json apontando para distribuição via Google Play/App Store — as lojas verificam a assinatura do APK/IPA na instalação, fornecendo anti-tampering nativo. Aplicado abaixo.",
+        "avancada": "Para distribuição interna controlada, configurar EAS Update com code signing:\n```bash\neas update:configure --code-signing\n```\nIsso gera um par de chaves RSA; o runtime do expo-updates verifica a assinatura do bundle antes de aplicar updates OTA."
+      }
+    },
+    {
+      "id": "M7-05",
+      "titulo": "Debug logging ativo em produção (50+ chamadas console.error)",
+      "checkpoint": "5. Debug detection: app bloqueia quando depurador está anexado? / 9. Stack traces em produção",
+      "severidade": "Baixo",
+      "componentes": [
+        "src/database/localDb.ts (14 console.error com stack traces de erro do SQLite)",
+        "src/screens/saude/*.tsx (6 console.error expondo contexto de operações de saúde animal)",
+        "src/screens/queijaria/*.tsx (20+ console.error expondo contexto de operações de queijaria)"
+      ],
+      "evidencia": {
+        "contagem": "50+ chamadas console.error() distribuídas em 20+ arquivos em src/. Exemplos representativos:\n- localDb.ts:132: console.error('Erro ao inicializar banco local:', error);\n- localDb.ts:155: console.error('saveAnimaisLocal error:', error);\n- MastiteClinicaScreen.tsx:193: console.error(e); // stack trace completo\n- RastreabilidadeScreen.tsx:151: console.error(e); // stack trace completo",
+        "impacto_producao": "Em builds de produção React Native, chamadas console.* não são removidas automaticamente — são emitidas para o log do sistema operacional (ADB logcat no Android, Xcode Console no iOS). Qualquer dispositivo conectado via USB a um computador com ADB/Xcode instalado expõe esses logs sem precisar de root.",
+        "sem_bloqueio_debugger": "Nenhuma verificação de depurador (ex.: `if (__DEV__) { ... }`) protege os logs. A flag __DEV__ é usada apenas em src/config/api.ts:4 para seleção de URL, não para controle de logging.",
+        "sem_stack_trace_para_usuario": "POSITIVO: a função getMensagemErro() em api.ts retorna apenas error.message (controlado) ou mensagem genérica — stack traces NÃO são exibidas na interface do usuário final. O risco é de log via ADB/Xcode, não de exposição visual no app."
+      },
+      "causa_raiz": "Console.error usado indiscriminadamente para debugging de desenvolvimento — prática comum em React Native, mas que não deve persistir em builds de produção sem filtragem.",
+      "cenario_ataque": "Atacante conecta dispositivo via USB → executa `adb logcat | grep AgroControl` → observa em tempo real os erros de banco de dados, falhas de sincronização e stack traces que revelam a estrutura interna do app e podem conter dados de negócio em mensagens de erro.",
+      "esforco_ataque": "5 minutos com dispositivo conectado e ADB instalado. Não requer root.",
+      "risco_negocio": "Baixo-Médio. Principalmente informações de estrutura interna — nomes de funções, estrutura do banco, fluxo de erros. Raramente contém dados de usuário diretamente, mas fornece mapa para ataques mais direcionados.",
+      "status": "Corrigido",
+      "correcao_aplicada": "Adicionado `babel-plugin-transform-remove-console` como devDependency e configurado em babel.config.js para remover automaticamente todas as chamadas console.* nos builds de produção (`NODE_ENV === 'production'`). Abordagem additive-only: em desenvolvimento o comportamento permanece idêntico; apenas builds de produção via EAS Build (que define NODE_ENV=production) terão os console.* removidos.",
+      "remediacao": {
+        "aplicada": "Ver seção correcao_aplicada acima."
+      }
+    },
+    {
+      "id": "M7-06",
+      "titulo": "Sem perfil 'production' no eas.json",
+      "checkpoint": "6. Symbols stripping: debug symbols removidos no build de produção?",
+      "severidade": "Alto",
+      "componentes": [
+        "eas.json (apenas perfis 'development' e 'preview')"
+      ],
+      "evidencia": {
+        "eas_json_atual": "{\n  \"build\": {\n    \"development\": { \"developmentClient\": true, \"distribution\": \"internal\", \"android\": { \"buildType\": \"apk\" } },\n    \"preview\": { \"distribution\": \"internal\", \"android\": { \"buildType\": \"apk\" } }\n  }\n}",
+        "impacto": "O perfil 'preview' com distribution 'internal' e buildType 'apk' pode estar sendo usado como build de 'produção' informal. Esse perfil NÃO define: (a) distribution 'store' para acionar otimizações de release do Google Play, (b) buildType 'aab' (Android App Bundle, necessário para Play Store e que habilita otimizações de código), nem (c) qualquer configuração explícita de release signing. Resultado: builds enviados a usuários podem estar sem todas as otimizações de produção.",
+        "sem_aab": "buildType: 'apk' gera APK universal — o formato AAB (App Bundle) não apenas é exigido pela Play Store mas também aplica tree-shaking e code splitting mais agressivos que reduzem a superfície do bundle exposto."
+      },
+      "causa_raiz": "O projeto nunca chegou a um ciclo de release de produção — os perfis de build refletem o estágio de desenvolvimento interno atual.",
+      "cenario_ataque": "Build informal de 'produção' gerado com o perfil 'preview' (APK sem otimizações de loja) tem debug symbols preservados nas camadas nativas, facilita desmontagem com jadx e é instalável sem verificação de integridade da loja.",
+      "esforco_ataque": "Trivial — o APK já está disponível para quem recebe o link de distribuição interna.",
+      "risco_negocio": "Alto. Um APK de produção sem as proteções adequadas é o vetor de ataque para todos os outros achados M7.",
+      "status": "Corrigido",
+      "correcao_aplicada": "Adicionado perfil 'production' ao eas.json com distribution 'store', buildType 'aab' para Android (habilita otimizações da Play Store e AAB que reduz o bundle exposto) e configuração de credenciais automáticas. O perfil 'preview' mantido inalterado para distribuição de teste interna."
+    },
+    {
+      "id": "M7-07",
+      "titulo": "ProGuard/R8 explicitamente desabilitado",
+      "checkpoint": "7. ProGuard/R8 (Android): regras configuradas corretamente?",
+      "severidade": "Alto",
+      "componentes": [
+        "app.json:52 (enableProguardInReleaseBuilds: false)",
+        "app.json:53 (enableShrinkResourcesInReleaseBuilds: false)"
+      ],
+      "evidencia": {
+        "app_json_atual": "\"enableProguardInReleaseBuilds\": false,\n\"enableShrinkResourcesInReleaseBuilds\": false",
+        "impacto_jadx": "Com ProGuard desabilitado, o APK contém os nomes originais de todas as classes Java/Kotlin dos wrappers de módulos nativos do Expo e React Native. Qualquer pessoa pode abrir o APK no jadx-gui e navegar pela estrutura completa: `com.anonymous.AgroControl.MainApplication`, `expo.modules.securestore.SecureStoreModule`, `expo.modules.sqlite.SQLiteModule`, etc. — incluindo nomes de métodos, argumentos e constantes.",
+        "nomes_expostos": "Exemplo de o que fica exposto sem ProGuard:\n- Classe: expo.modules.filesystem.FileSystemModule.readAsStringAsync()\n- Classe: expo.modules.securestore.SecureStoreModule.setValueWithKeyAsync()\n- Strings de constantes dos módulos Expo em texto puro no APK",
+        "sem_regras_customizadas": "Não existe arquivo proguard-rules.pro no diretório raiz do projeto (apenas em node_modules de bibliotecas de terceiros que têm suas próprias regras). Com `enableProguardInReleaseBuilds: false`, mesmo as regras dos node_modules são ignoradas."
+      },
+      "causa_raiz": "ProGuard foi desabilitado explicitamente — provavelmente para evitar problemas de build durante o desenvolvimento inicial. É uma prática comum 'temporária' que frequentemente persiste até produção.",
+      "cenario_ataque": "Atacante baixa o APK → abre no jadx-gui (ferramenta gratuita) → em 10 minutos tem a estrutura completa das classes nativas, podendo mapear todos os módulos Expo disponíveis, seus métodos e possíveis pontos de hooking via Frida.",
+      "esforco_ataque": "10-20 minutos para análise inicial com jadx. Exploração completa: 2-4 horas.",
+      "risco_negocio": "Alto. Facilita significativamente a engenharia reversa e o desenvolvimento de exploits baseados nos módulos nativos expostos.",
+      "status": "Corrigido",
+      "correcao_aplicada": "enableProguardInReleaseBuilds alterado para true e enableShrinkResourcesInReleaseBuilds alterado para true em app.json. O Expo Managed Workflow inclui regras ProGuard automáticas para todos os módulos Expo (via `expo-modules-core/android/proguard-rules.pro`, `expo/android/proguard-rules.pro`, `react-native/ReactAndroid/proguard-rules.pro`) que já cobrem os módulos em uso. Nenhuma regra customizada adicional foi necessária para o conjunto de módulos do projeto.",
+      "remediacao": {
+        "aplicada": "Ver correcao_aplicada acima.",
+        "nota_importante": "Se um build de release com ProGuard habilitado apresentar crash (ClassNotFound, método ausente), o diagnóstico é feito via `eas build --profile production --local` com retrace usando o arquivo de mapeamento gerado. A Expo documenta este processo em https://docs.expo.dev/build/eas-build-on-github/."
+      }
+    },
+    {
+      "id": "M7-08",
+      "titulo": "Bitcode iOS — Não Aplicável",
+      "checkpoint": "8. Bitcode (iOS): habilitado? Pode facilitar análise?",
+      "severidade": "Informativo",
+      "evidencia": "Bitcode foi depreciado pela Apple no Xcode 14 (setembro 2022) e completamente removido no Xcode 15. O React Native 0.71+ (e Expo SDK 48+) não usa mais bitcode. Nenhuma configuração de bitcode foi encontrada em app.json ou EAS. O Xcode atualmente ignora qualquer flag de bitcode silenciosamente.",
+      "status": "Não aplicável",
+      "correcao_aplicada": null
+    },
+    {
+      "id": "M7-09",
+      "titulo": "PROD_URL do backend hardcoded e visível no bundle",
+      "checkpoint": "Achado adicional — dado sensível de infraestrutura exposto no bundle",
+      "severidade": "Baixo",
+      "componentes": [
+        "src/config/api.ts:1-4"
+      ],
+      "evidencia": {
+        "codigo": "const DEV_URL = 'http://localhost:5249';\nconst PROD_URL = 'https://unenvied-snowfall-undrafted.ngrok-free.dev';\nexport const API_URL = __DEV__ ? DEV_URL : PROD_URL;",
+        "impacto": "A URL de produção do backend (ngrok) está em texto puro no bundle JavaScript. Qualquer pessoa que decompilar o APK ou extrair o main.jsbundle do IPA encontrará esta URL imediatamente. Em produção real, isso exporia a URL de um servidor de produção permanente a qualquer pessoa que analise o app.",
+        "mitigante_atual": "O ngrok free tier usa subdomínios que rotacionam — `unenvied-snowfall-undrafted.ngrok-free.dev` só funciona enquanto o túnel estiver ativo. Se o servidor mudar de URL, o app para de funcionar de qualquer forma. Para produção com domínio fixo, o risco se torna significativo."
+      },
+      "causa_raiz": "Configuração de URL diretamente no código fonte, sem uso de variáveis de ambiente de build (EAS Build secrets).",
+      "status": "Pendente de correção",
+      "correcao_aplicada": null,
+      "remediacao": {
+        "descricao": "Mover PROD_URL para EAS Build secrets e acessar via `expo-constants` ou `process.env` em tempo de build:\n```bash\neas secret:create --scope project --name EXPO_PUBLIC_API_URL --value https://api.seudominio.com\n```\n```typescript\n// src/config/api.ts\nconst PROD_URL = process.env.EXPO_PUBLIC_API_URL ?? '';\n```\nVariáveis prefixadas com EXPO_PUBLIC_ são injetadas no bundle em build time pelo Expo CLI, sem aparecer no código fonte commitado.",
+        "motivo_nao_aplicado": "Requer configuração de EAS Secrets no projeto EAS e estabilização do domínio de backend (atualmente ngrok rotativo, ver M2-12 pendente). Sem domínio de produção estável, não há PROD_URL que valha proteger. Documentado para implementação junto com M2-12."
+      }
+    }
+  ],
+  "verificacoes_sem_achados": [
+    "Stack traces para o usuário final: getMensagemErro() em api.ts retorna apenas error.message (controlado pelo backend) ou mensagem genérica de conectividade — nenhum stack trace técnico é exibido na interface do usuário.",
+    "Dados sensíveis em strings hardcoded além de URLs: nenhuma chave de API, secret, token JWT ou credencial encontrada em texto puro em src/ (as credenciais foram movidas para SecureStore em M1)."
+  ],
+  "resumo_risco": {
+    "critico": 0,
+    "alto": 2,
+    "medio": 2,
+    "baixo": 2,
+    "informativo": 1,
+    "nao_aplicavel": 1
+  },
+  "correcoes_aplicadas_nesta_sessao": [
+    "M7-05: babel.config.js — adicionado babel-plugin-transform-remove-console para remover console.* em produção",
+    "M7-06: eas.json — adicionado perfil 'production' com distribution store e buildType aab",
+    "M7-07: app.json — enableProguardInReleaseBuilds: true e enableShrinkResourcesInReleaseBuilds: true",
+    "M7-01 (parcial): app.json — adicionado jsEngine: hermes no bloco iOS para compilação bytecode HBC no iOS também"
+  ],
+  "correcoes_pendentes": [
+    "M7-01: Ofuscação JS via babel-plugin-obfuscator (requer validação em EAS Build — risco de impacto em performance)",
+    "M7-02: Detecção de root via react-native-device-info (requer instalação de biblioteca nativa e EAS Build)",
+    "M7-03: Detecção de emulador via expo-device (agrupado com M7-02)",
+    "M7-04: Anti-tampering via EAS Update com code signing (requer configuração de par de chaves e expo-updates)",
+    "M7-09: PROD_URL via EAS Secrets (requer domínio de backend estável — bloqueado por M2-12)"
+  ]
+}

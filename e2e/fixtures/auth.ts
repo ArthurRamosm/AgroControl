@@ -9,9 +9,9 @@
  *   globalSetup: './e2e/fixtures/auth.ts'
  *   use: { storageState: './e2e/.auth/session.json' }
  *
- * Credenciais via variáveis de ambiente:
+ * Credenciais via variáveis de ambiente (obrigatórias, sem fallback fixo):
  *   TEST_USER=<usuario>  TEST_PASS=<senha>
- * Padrão de fallback: 'demo' / 'demo123'
+ * [OWASP M1-04] Ver docs/security/owasp-m1-relatorio.json
  */
 
 import { chromium, FullConfig } from '@playwright/test';
@@ -21,6 +21,16 @@ import fs from 'fs';
 export const STORAGE_STATE = path.join(__dirname, '..', '.auth', 'session.json');
 
 export default async function globalSetup(_config: FullConfig) {
+  const testUser = process.env.TEST_USER;
+  const testPass = process.env.TEST_PASS;
+  if (!testUser || !testPass) {
+    throw new Error(
+      'TEST_USER e TEST_PASS precisam ser definidos como variáveis de ambiente ' +
+      'para rodar os testes E2E. Nenhuma credencial fixa é usada como fallback ' +
+      '(OWASP M1).'
+    );
+  }
+
   fs.mkdirSync(path.dirname(STORAGE_STATE), { recursive: true });
 
   const browser = await chromium.launch();
@@ -29,8 +39,8 @@ export default async function globalSetup(_config: FullConfig) {
   const baseURL = process.env.APP_URL ?? 'http://localhost:8081';
   await page.goto(baseURL);
 
-  await page.getByPlaceholder('Usuário').fill(process.env.TEST_USER ?? 'demo');
-  await page.getByPlaceholder('Senha').fill(process.env.TEST_PASS ?? 'demo123');
+  await page.getByPlaceholder('Usuário').fill(testUser);
+  await page.getByPlaceholder('Senha').fill(testPass);
   await page.getByText('Entrar').click();
 
   await page.waitForSelector('[data-testid="home-screen"]', { timeout: 20_000 });

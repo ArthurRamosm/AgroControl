@@ -1,5 +1,6 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
 import * as SQLite from 'expo-sqlite';
 import { Platform } from 'react-native';
 
@@ -225,12 +226,16 @@ export async function gerarPdfAnaliseLab(
 
   const { uri } = await Print.printToFileAsync({ html });
 
-  const podeCompartilhar = await Sharing.isAvailableAsync();
-  if (podeCompartilhar) {
-    await Sharing.shareAsync(uri, {
-      mimeType: 'application/pdf',
-      dialogTitle: `PL 01/03 – Análise Laboratorial ${ano}`,
-      UTI: 'com.adobe.pdf',
-    });
+  try {
+    const podeCompartilhar = await Sharing.isAvailableAsync();
+    if (podeCompartilhar) {
+      await Sharing.shareAsync(uri, {
+        mimeType: 'application/pdf',
+        dialogTitle: `PL 01/03 – Análise Laboratorial ${ano}`,
+        UTI: 'com.adobe.pdf',
+      });
+    }
+  } finally {
+    await FileSystem.deleteAsync(uri, { idempotent: true });
   }
 }

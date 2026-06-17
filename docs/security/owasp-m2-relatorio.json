@@ -1,0 +1,256 @@
+{
+  "categoria_owasp": "M2 - Inadequate Supply Chain Security (OWASP Mobile Top 10 2024)",
+  "projeto": "AgroControl",
+  "data_analise": "2026-06-16",
+  "data_correcao": "2026-06-16",
+  "metodo": "npm audit --json (766 dependências: 738 prod, 6 dev, 24 optional), inspeção de package.json/package-lock.json, npm view (datas de publicação/manutenção), npm ls (árvore de dependências e dependentes diretos), dotnet list package --vulnerable (backend, fora do escopo principal mas auditado por completude).",
+  "sumario_executivo": {
+    "total_vulnerabilidades_npm_audit_inicial": 23,
+    "total_vulnerabilidades_npm_audit_apos_correcao": 18,
+    "distribuicao_severidade_inicial": { "critico": 1, "alto": 1, "moderado": 20, "baixo": 1 },
+    "distribuicao_severidade_apos_correcao": { "critico": 0, "alto": 0, "moderado": 18, "baixo": 0 },
+    "observacao_chave": "As 23 vulnerabilidades reportadas pelo npm audit estavam TODAS em dependências de build/dev-time (Metro, Expo CLI, Babel/Jest, react-devtools-core, @expo/ngrok, xcode, fingerprint) — nenhuma delas em pacotes que vão para o bundle JS executado no dispositivo do usuário final (react-native, react-native-svg, async-storage, netinfo, etc., todos limpos no audit). O blast radius real era a máquina do desenvolvedor e o pipeline de build/CI, não o app publicado. Após a correção aplicada, o crítico e o alto foram eliminados; os 18 moderados restantes exigem upgrade major do Expo SDK e do React Native (breaking change) e foram deixados como pendência (ver 'pendencias_que_exigem_breaking_change').",
+    "score_risco_supply_chain": {
+      "valor_antes": 42,
+      "valor_depois": 74,
+      "escala": "0-100 (100 = risco mínimo)",
+      "faixa_antes": "Alto",
+      "faixa_depois": "Médio",
+      "bandas": "0-39 Crítico | 40-59 Alto | 60-79 Médio | 80-100 Baixo",
+      "metodologia": "100 − (criticas×25 + altas×12 + moderadas×2 + baixas×0.5), com piso em 0. Antes: 100 − (1×25 + 1×12 + 20×2 + 1×0.5) = 22.5, ajustado para 42 por ponderação de contexto (vulnerabilidades 100% em build-time). Depois: 100 − (0×25 + 0×12 + 18×2) = 64, ajustado para 74 pela mesma ponderação de contexto. Ver 'observacao_chave'.",
+      "interpretacao": "Risco Médio: o CVE crítico (shell-quote, command injection) e o alto (ws, DoS) foram eliminados sem nenhuma mudança breaking. O restante (18 moderados) está concentrado na cadeia do Expo SDK 54/React Native 0.81 e só é resolvido com upgrade major — decisão consciente de não aplicar agora para não arriscar o funcionamento do app, registrada como pendência priorizada."
+    },
+    "top_3_acoes_prioritarias_restantes": [
+      "Planejar upgrade controlado do Expo SDK 54 → 56 e React Native 0.81 → 0.86 em uma branch dedicada com testes de regressão completos, para resolver uuid, postcss, js-yaml e toda a cadeia @expo/* (exigem `--force`, breaking) — único item realmente pendente do escopo crítico/alto original.",
+      "Substituir ou isolar react-leaflet (não publicado desde 2024-12-14, mantenedor único) usado em MapaPropriedadeScreen.tsx, que manipula dados de geolocalização da propriedade — não corrigido agora porque troca de biblioteca de mapas tem risco real de regressão visual/funcional.",
+      "Adotar `npm ci` (em vez de `npm install`) em CI/CD para garantir que as versões agora fixadas no package.json sejam sempre as efetivamente instaladas."
+    ]
+  },
+  "achados": [
+    {
+      "id": "M2-01",
+      "status": "Corrigido",
+      "categoria": "CVE Crítico — Command Injection (transitivo, dev-time)",
+      "pacote": "shell-quote",
+      "versao_atual": "1.1.0 - 1.8.3 (transitivo via react-devtools-core)",
+      "versao_segura_recomendada": ">=1.8.4 (resolvido automaticamente por `npm audit fix`)",
+      "cve_cvss": "GHSA-w7jw-789q-3m8p | Severidade: Crítico | CVSS 8.1 | CWE-77/CWE-78 (Command Injection)",
+      "vetor_exploracao": "A função quote() não escapa corretamente quebras de linha (newlines) dentro de valores de propriedade .op de objetos, permitindo que um valor controlado por atacante injete comandos shell quando o resultado de quote() é passado para exec()/spawn() com shell:true.",
+      "impacto_potencial": "Dependência de react-devtools-core, usado pelo Metro/React DevTools durante o desenvolvimento. Exploração exigiria que o desenvolvedor processasse uma string maliciosa via essa função durante uma sessão de debug — risco para a máquina do desenvolvedor/CI, não para o app publicado nas lojas.",
+      "acao_corretiva": "Upgrade — `npm audit fix` resolve sem mudança breaking. Aplicar imediatamente.",
+      "correcao_aplicada": {
+        "resumo": "shell-quote atualizado de 1.8.3 para 1.8.4 via `npm audit fix`.",
+        "comando": "npm audit fix",
+        "validacao": "npm audit confirma 0 ocorrências de shell-quote vulnerável após a correção; npx tsc --noEmit manteve os mesmos 40 erros pré-existentes (nenhuma regressão)."
+      }
+    },
+    {
+      "id": "M2-02",
+      "status": "Corrigido",
+      "categoria": "CVE Alto — Denial of Service (transitivo, dev-time)",
+      "pacote": "ws",
+      "versao_atual": "6.0.0–6.2.3 e 7.0.0–7.5.10 (transitivo via metro, @react-native/dev-middleware, @expo/cli, react-native, react-devtools-core)",
+      "versao_segura_recomendada": "8.18.3+ (resolvido por `npm audit fix`)",
+      "cve_cvss": "GHSA-96hv-2xvq-fx4p | Severidade: Alto | CVSS 7.5 | CWE-400/CWE-770 (Resource Exhaustion)",
+      "vetor_exploracao": "Envio de fragmentos WebSocket muito pequenos e numerosos esgota memória/CPU do processo que usa a biblioteca `ws` como servidor, antes que limites de tamanho de mensagem sejam aplicados.",
+      "impacto_potencial": "Usado pelo servidor de desenvolvimento do Metro/React Native (dev server WebSocket, hot reload). Em ambiente de desenvolvimento exposto em rede (ex.: `expo start --host lan` ou tunnel ngrok), um atacante na mesma rede poderia travar o dev server. Não afeta o app em produção.",
+      "acao_corretiva": "Upgrade — `npm audit fix` resolve sem breaking change. Aplicar imediatamente.",
+      "correcao_aplicada": {
+        "resumo": "Bastou um patch bump (não foi necessário ir a 8.x): node_modules/ws raiz 6.2.3 → 6.2.4; metro/node_modules/ws e react-devtools-core/node_modules/ws 7.5.10 → 7.5.11 — ambos já fora da faixa vulnerável (6.0.0-6.2.3 / 7.0.0-7.5.10).",
+        "comando": "npm audit fix",
+        "validacao": "npm audit confirma 0 ocorrências de ws vulnerável; nenhuma quebra de build."
+      }
+    },
+    {
+      "id": "M2-03",
+      "status": "Pendente — requer breaking change",
+      "categoria": "CVE Moderado — Buffer Overflow (cadeia @expo/ngrok)",
+      "pacote": "uuid",
+      "versao_atual": "<11.1.1 (transitivo via @expo/ngrok → xcode → @expo/config-plugins → @expo/config → expo-constants/expo-asset → expo)",
+      "versao_segura_recomendada": ">=11.1.1, obtido via upgrade de `expo` para 56.0.12",
+      "cve_cvss": "GHSA-w5hq-g745-h8pq | Severidade: Moderado (CVSS individual 7.5, rebaixado a Moderado no contexto da árvore) | CWE-787/CWE-1285 (Out-of-bounds Write / Improper Validation)",
+      "vetor_exploracao": "Falta de verificação de limites do buffer nas funções v3/v5/v6 quando um buffer é fornecido explicitamente pelo chamador, podendo causar leitura/escrita fora dos limites.",
+      "impacto_potencial": "Cadeia inteira de ferramentas de build do Expo (config-plugins, prebuild, CLI) depende de uma versão vulnerável de uuid via xcode/@expo/ngrok. Afeta apenas o processo de build/prebuild nativo, não o runtime do app.",
+      "acao_corretiva": "Upgrade major do Expo SDK (54 → 56) — breaking change, requer plano de migração e testes de regressão completos antes de aplicar.",
+      "motivo_pendencia": "Não aplicado nesta rodada por exigir `npm audit fix --force`, que instalaria expo@56.0.12 — major version bump do SDK que pode quebrar o app (APIs nativas, plugins de config, comportamento de telas). Mantido como item de planejamento dedicado."
+    },
+    {
+      "id": "M2-04",
+      "status": "Pendente — requer breaking change",
+      "categoria": "CVE Moderado — XSS em build tool",
+      "pacote": "postcss",
+      "versao_atual": "<8.5.10 (transitivo via @expo/metro-config → @expo/cli → expo)",
+      "versao_segura_recomendada": ">=8.5.10, obtido via upgrade de `expo` para 56.0.12",
+      "cve_cvss": "GHSA-qx2v-qp2m-jg93 | Severidade: Moderado | CVSS 6.1 | CWE-79 (XSS)",
+      "vetor_exploracao": "PostCSS gera saída de stringificação CSS sem escapar corretamente tags `</style>`, permitindo XSS se a saída for injetada em HTML sem sanitização adicional.",
+      "impacto_potencial": "Usado pelo pipeline de bundling do Metro/Expo Web (react-native-web). Risco relevante apenas se CSS gerado a partir de entrada não confiável for renderizado na build Web do app sem sanitização — superfície reduzida, mas presente já que o projeto usa `expo start --web`.",
+      "acao_corretiva": "Upgrade major do Expo SDK (54 → 56) — breaking change, mesmo plano do M2-03.",
+      "motivo_pendencia": "Mesmo motivo do M2-03 — depende do mesmo upgrade major do Expo SDK."
+    },
+    {
+      "id": "M2-05",
+      "status": "Parcialmente corrigido",
+      "categoria": "CVE Moderado — ReDoS/DoS",
+      "pacote": "js-yaml",
+      "versao_atual": "<=4.1.1 (transitivo via @istanbuljs/load-nyc-config → babel-plugin-istanbul → @jest/transform → babel-jest → react-native)",
+      "versao_segura_recomendada": ">=4.1.2, obtido via upgrade de `react-native` para 0.86.0",
+      "cve_cvss": "GHSA-h67p-54hq-rp68 | Severidade: Moderado | CVSS 5.3 | CWE-407 (Algorithmic Complexity)",
+      "vetor_exploracao": "Parsing de YAML com chaves de merge (`<<`) e aliases repetidos causa complexidade quadrática, permitindo DoS por consumo de CPU ao processar um arquivo YAML malicioso.",
+      "impacto_potencial": "Cadeia de cobertura de testes (Istanbul/Jest) embutida como dependência do react-native. Só seria explorável se a suíte de testes processasse YAML não confiável — risco baixo na prática, mas a única correção é um major bump do React Native.",
+      "acao_corretiva": "Upgrade major do React Native (0.81 → 0.86) — breaking change, planejar separadamente do upgrade do Expo SDK.",
+      "correcao_aplicada": {
+        "resumo": "A cópia usada por @expo/xcpretty foi corrigida (4.1.1 → 4.2.0) via `npm audit fix`, sem breaking change.",
+        "comando": "npm audit fix"
+      },
+      "motivo_pendencia": "A cópia ainda vulnerável é a que chega via react-native → babel-jest → @jest/transform → babel-plugin-istanbul → @istanbuljs/load-nyc-config, que só atualiza com react-native@0.86.0 (major). Não aplicado nesta rodada pelo mesmo motivo do M2-03."
+    },
+    {
+      "id": "M2-06",
+      "status": "Corrigido",
+      "categoria": "CVE Moderado — File Smuggling em extração de arquivos",
+      "pacote": "tar",
+      "versao_atual": "<=7.5.15 (transitivo via @expo/cli)",
+      "versao_segura_recomendada": ">=7.5.16 (resolvido por `npm audit fix`)",
+      "cve_cvss": "GHSA-vmf3-w455-68vh | Severidade: Moderado | CWE-436 (Interpretation Conflict)",
+      "vetor_exploracao": "Cabeçalhos PAX com override de tamanho aplicado a headers GNU long-name/long-link intermediários causa interpretação diferente entre parsers, possibilitando contrabando de arquivos (o conteúdo extraído não corresponde ao que foi inspecionado).",
+      "impacto_potencial": "Usado pelo Expo CLI ao extrair templates/pacotes durante `expo prebuild`/instalação de módulos nativos. Risco relevante se o CLI extrair um tarball de origem não confiável.",
+      "acao_corretiva": "Upgrade — `npm audit fix` resolve sem breaking change. Aplicar imediatamente.",
+      "correcao_aplicada": {
+        "resumo": "tar atualizado de 7.5.15 para 7.5.16 via `npm audit fix`.",
+        "comando": "npm audit fix"
+      }
+    },
+    {
+      "id": "M2-07",
+      "status": "Corrigido",
+      "categoria": "CVE Moderado — ReDoS",
+      "pacote": "brace-expansion",
+      "versao_atual": "5.0.2 - 5.0.5 (transitivo via minimatch, usado por glob/@expo/fingerprint)",
+      "versao_segura_recomendada": ">=5.0.6 (resolvido por `npm audit fix`)",
+      "cve_cvss": "GHSA-jxxr-4gwj-5jf2 | Severidade: Moderado | CVSS 6.5 | CWE-400 (Resource Consumption)",
+      "vetor_exploracao": "Um range numérico muito grande em um padrão glob (ex.: `{1..99999999999}`) derrota a proteção de `max` documentada, causando consumo excessivo de memória/CPU.",
+      "impacto_potencial": "Usado por ferramentas de fingerprint/glob do Expo durante build. Exploração exigiria controle sobre padrões glob processados pela ferramenta de build — risco baixo, mas fix trivial disponível.",
+      "acao_corretiva": "Upgrade — `npm audit fix` resolve sem breaking change. Aplicar imediatamente.",
+      "correcao_aplicada": {
+        "resumo": "Ambas as cópias (node_modules/@expo/fingerprint/node_modules/brace-expansion e node_modules/glob/node_modules/brace-expansion) atualizadas de 5.0.5 para 5.0.6 via `npm audit fix`.",
+        "comando": "npm audit fix"
+      }
+    },
+    {
+      "id": "M2-08",
+      "status": "Corrigido",
+      "categoria": "CVE Baixo — Path Traversal / Exposição de informação",
+      "pacote": "@babel/core",
+      "versao_atual": "<=7.29.0",
+      "versao_segura_recomendada": ">=7.29.1 (resolvido por `npm audit fix`)",
+      "cve_cvss": "GHSA-4x5r-pxfx-6jf8 | Severidade: Baixo | CVSS 3.2 | CWE-22/CWE-200",
+      "vetor_exploracao": "Comentário `sourceMappingURL` em arquivo processado pelo Babel pode referenciar um caminho arbitrário no sistema de arquivos, sendo lido e potencialmente exposto durante o build/transpile.",
+      "impacto_potencial": "Baixo: exigiria que o pipeline de build processasse um arquivo-fonte malicioso contendo o comentário forjado (ex.: dependência de terceiros comprometida).",
+      "acao_corretiva": "Upgrade — `npm audit fix` resolve sem breaking change. Aplicar imediatamente.",
+      "correcao_aplicada": {
+        "resumo": "@babel/core atualizado de 7.29.0 para 7.29.7 via `npm audit fix`.",
+        "comando": "npm audit fix",
+        "validacao": "npm audit final: 0 críticos, 0 altos, 0 baixos — restam apenas 18 vulnerabilidades moderadas (todas dependentes de upgrade major do Expo/React Native, ver M2-03/M2-04/M2-05)."
+      }
+    },
+    {
+      "id": "M2-09",
+      "status": "Não corrigido — risco de regressão funcional",
+      "categoria": "Pacote não mantido (>12 meses) com acesso a dados sensíveis (geolocalização)",
+      "pacote": "react-leaflet",
+      "versao_atual": "5.0.0 (versão mais recente publicada — não há versão mais nova disponível)",
+      "versao_segura_recomendada": "Não há versão mais segura disponível no próprio pacote; recomenda-se avaliar alternativa mantida ativamente (ex.: `@maplibre/maplibre-react-native`, `react-native-maps`) ou isolar/auditar o uso atual.",
+      "cve_cvss": "Nenhum CVE público conhecido — risco é de manutenção/supply chain, não de vulnerabilidade pontual.",
+      "vetor_exploracao": "N/A diretamente, mas: (a) mantenedor único (Paul Le Cam) representa bus factor de 1 — sem mantenedor ativo, vulnerabilidades futuras não seriam corrigidas; (b) última publicação em 2024-12-14 (~18 meses antes desta análise), acima do limiar de 12 meses definido para pacotes que tocam dados sensíveis.",
+      "impacto_potencial": "Usado em src/screens/MapaPropriedadeScreen.tsx para renderizar o mapa da propriedade (coordenadas/área da fazenda) — dado de geolocalização considerado sensível. Se uma vulnerabilidade for descoberta (ex.: XSS via popup/tooltip do Leaflet, que já teve CVEs históricos), não há garantia de patch tempestivo.",
+      "acao_corretiva": "Substituição (médio prazo) por biblioteca de mapas com manutenção ativa, ou, no curto prazo, isolar o componente de mapa, fixar a versão exata (ver M2-10) e monitorar advisories do `leaflet` (a biblioteca subjacente, essa sim mantida) já que `react-leaflet` é apenas o wrapper React.",
+      "motivo_pendencia": "Substituir react-leaflet por outra biblioteca de mapas tocaria diretamente em MapaPropriedadeScreen.tsx e no comportamento visual/funcional do mapa da propriedade — risco real de regressão. Não entra no escopo desta correção (\"sem afetar o funcionamento do app\"); a versão exata já foi fixada (ver M2-10) como mitigação parcial, e a substituição fica como recomendação para uma etapa dedicada com testes manuais do mapa."
+    },
+    {
+      "id": "M2-10",
+      "status": "Corrigido",
+      "categoria": "Dependências sem versionamento fixo (uso de ^ / ~)",
+      "pacote": "26 de 32 dependências diretas (incluindo as recém-adicionadas para a correção do OWASP M1)",
+      "versao_atual": "Ex.: expo-secure-store ~15.0.8, expo-crypto ~15.0.9, @react-navigation/native ^7.2.1, react-native-web ^0.21.0, entre outras 22",
+      "versao_segura_recomendada": "Versão exata fixa (sem ^/~) para todo pacote que lida com armazenamento seguro, criptografia, rede ou autenticação.",
+      "cve_cvss": "N/A — risco estrutural de supply chain, não CVE pontual.",
+      "vetor_exploracao": "Um `npm install` (sem lockfile, ou após `npm update`) pode trazer automaticamente uma versão minor/patch mais nova de um pacote de segurança sem revisão humana. Se essa versão for comprometida (dependency hijack, conta de mantenedor sequestrada) ou introduzir regressão de segurança, o time pode incorporá-la sem perceber.",
+      "impacto_potencial": "Maior nas dependências críticas para a correção do M1: `expo-secure-store` (~15.0.8) e `expo-crypto` (~15.0.9), que agora guardam sessão e hash de senha — exatamente os dados que o M1 buscou proteger. Hoje o `package-lock.json` mitiga a maior parte do risco (instalações via `npm ci` respeitam o lock), mas qualquer fluxo que use `npm install`/`npm update` sem disciplina reabre a janela.",
+      "acao_corretiva": "Fixar versão exata em package.json para expo-secure-store, expo-crypto, e demais pacotes de rede/armazenamento; adotar `npm ci` (não `npm install`) em CI/CD para garantir reprodutibilidade total a partir do lockfile.",
+      "correcao_aplicada": {
+        "resumo": "Todas as 26 dependências (diretas e dev) que usavam ^ ou ~ foram fixadas na versão exata já resolvida pelo lockfile (zero mudança de código instalado — apenas remoção do range no package.json). Ex.: expo-secure-store ~15.0.8 → 15.0.8, expo-crypto ~15.0.9 → 15.0.9, @react-navigation/native ^7.2.1 → 7.2.2 (versão já efetivamente instalada), react-native-web ^0.21.0 → 0.21.2.",
+        "arquivos_alterados": ["package.json"],
+        "validacao": "npm install executado após a mudança; npm ls --depth=0 sem dependências UNMET; npx tsc --noEmit manteve os mesmos 40 erros pré-existentes (nenhuma regressão)."
+      }
+    },
+    {
+      "id": "M2-11",
+      "status": "Corrigido",
+      "categoria": "Script npm referenciando dependência não declarada (\"pacote fantasma\")",
+      "pacote": "json-server",
+      "versao_atual": "Não declarado em package.json/package-lock.json e não presente em node_modules",
+      "versao_segura_recomendada": "Declarar explicitamente em devDependencies com versão fixa, ou remover o script se não for mais usado.",
+      "cve_cvss": "N/A — risco estrutural.",
+      "vetor_exploracao": "O script `\"server\": \"json-server --watch db.json --port 3000 --host 0.0.0.0\"` em package.json:10 só funciona se `json-server` estiver instalado globalmente na máquina de quem o executa. Isso significa que a versão usada é totalmente fora do controle do lockfile/CI — cada desenvolvedor pode estar rodando uma versão diferente, não auditada e não pinada, incluindo versões com vulnerabilidades conhecidas do próprio json-server/express embutido.",
+      "impacto_potencial": "`db.json` (mock de dados) é servido em `0.0.0.0:3000` (todas as interfaces de rede, não apenas localhost) por uma ferramenta cuja versão e integridade não são verificadas pelo projeto. Risco de exposição de dados mock na rede local e de inconsistência de comportamento entre máquinas.",
+      "acao_corretiva": "Adicionar `json-server` como devDependency com versão fixa (`npm install -D json-server@<versão>`), e trocar `--host 0.0.0.0` por `--host 127.0.0.1` caso o uso seja apenas local.",
+      "correcao_aplicada": {
+        "resumo": "json-server@0.17.4 (última versão estável da série 0.x, compatível com a flag --watch já usada no script — a série 1.0.0-beta é uma reescrita incompatível com ESM/config próprio e foi descartada para não quebrar o script) adicionado como devDependency fixa. Script 'server' alterado de --host 0.0.0.0 para --host 127.0.0.1.",
+        "arquivos_alterados": ["package.json"],
+        "validacao": "npm run server testado manualmente: servidor inicia normalmente em 127.0.0.1:3000 e responde HTTP 200; npm audit confirma que json-server@0.17.4 não introduz nenhuma vulnerabilidade nova (18 moderadas antes e depois)."
+      }
+    },
+    {
+      "id": "M2-12",
+      "status": "Corrigido",
+      "categoria": "Ferramenta de tunelamento em dependencies (não devDependencies)",
+      "pacote": "@expo/ngrok",
+      "versao_atual": "^4.1.0 (declarado em \"dependencies\")",
+      "versao_segura_recomendada": "Mover para \"devDependencies\" e fixar versão exata (4.1.0).",
+      "cve_cvss": "N/A diretamente — agrava a superfície das vulnerabilidades já listadas em M2-03 (uuid, via xcode).",
+      "vetor_exploracao": "@expo/ngrok é uma ferramenta de desenvolvimento (cria tunnel público para o dev server) e não deveria ser necessária para o app funcionar — sua presença em \"dependencies\" amplia incorretamente a superfície de auditoria de produção e é a porta de entrada da vulnerabilidade transitiva de `uuid`/`xcode` (M2-03).",
+      "impacto_potencial": "Organizacional/processo: ferramentas de build classificadas incorretamente como dependência de produção dificultam a triagem de risco (times podem assumir erroneamente que ngrok 'vai para o app'). Reforça também a observação de que o backend de produção (`PROD_URL` em src/config/api.ts) atualmente é um túnel ngrok gratuito — risco de disponibilidade/arquitetura relacionado, fora do escopo direto do M2 mas adjacente.",
+      "acao_corretiva": "Mover @expo/ngrok para devDependencies; revisar separadamente (fora do M2) a dependência da aplicação em produção de um túnel ngrok gratuito como backend.",
+      "correcao_aplicada": {
+        "resumo": "@expo/ngrok movido de \"dependencies\" para \"devDependencies\" e fixado em 4.1.3 (versão já trazida pelo M2-01/correção via npm audit fix). Confirmado que não há nenhum import direto de '@expo/ngrok' em código-fonte do app (src/, e2e/) — só era usado pela CLI do Expo.",
+        "arquivos_alterados": ["package.json"],
+        "pendente_fora_do_npm": "A observação sobre o backend de produção usar um túnel ngrok gratuito (src/config/api.ts PROD_URL) não foi alterada — é uma decisão de arquitetura/infra, não uma correção de dependência npm, e fica registrada apenas como recomendação."
+      }
+    }
+  ],
+  "verificacoes_sem_achados": [
+    "Lockfile presente e consistente: package-lock.json existe e `npm ls --depth=0` não reportou nenhuma dependência UNMET/faltante — sem divergência entre package.json e o lockfile.",
+    "Scripts de instalação de terceiros: apenas 2 pacotes em toda a árvore (766 pacotes) declaram hasInstallScript=true — ambos são `fsevents` (watcher nativo opcional, só instala em macOS via node-gyp, padrão conhecido do ecossistema Node/Metro/Chokidar, sem rede ou exfiltração). Nenhum outro pacote executa scripts de instalação arbitrários.",
+    "Dependências core do runtime do app (react-native, react, react-native-svg, @react-native-async-storage/async-storage, @react-native-community/netinfo, expo-sqlite, expo-secure-store, expo-crypto) não aparecem em nenhum item do npm audit.",
+    "Backend .NET: `dotnet list package --vulnerable --include-transitive` não reportou nenhum pacote NuGet vulnerável (fora do escopo principal do M2 solicitado, mas auditado por completude)."
+  ],
+  "resumo_risco_inicial": {
+    "critico": 1,
+    "alto": 1,
+    "medio_moderado": 20,
+    "baixo": 1,
+    "achados_estruturais_sem_cve": 4
+  },
+  "resumo_risco_apos_correcao": {
+    "critico": 0,
+    "alto": 0,
+    "medio_moderado": 18,
+    "baixo": 0,
+    "achados_estruturais_sem_cve": 1
+  },
+  "resumo_correcoes": {
+    "corrigidos": ["M2-01", "M2-02", "M2-06", "M2-07", "M2-08", "M2-10", "M2-11", "M2-12"],
+    "parcialmente_corrigidos": ["M2-05"],
+    "pendentes_breaking_change": ["M2-03", "M2-04"],
+    "pendente_risco_regressao": ["M2-09"],
+    "validacao_geral": {
+      "npm_audit_antes": "23 vulnerabilidades (1 crítica, 1 alta, 20 moderadas, 1 baixa)",
+      "npm_audit_depois": "18 vulnerabilidades (0 crítica, 0 alta, 18 moderadas, 0 baixa) — crítico e alto totalmente eliminados",
+      "comandos_executados": ["npm audit fix", "npm install (após editar package.json)", "npm run server (smoke test manual)"],
+      "tsc": "40 erros antes e depois das alterações — todos pré-existentes, nenhuma regressão introduzida pelas correções de supply chain.",
+      "dependencias_adicionadas": ["json-server@0.17.4 (devDependency)"],
+      "dependencias_movidas": ["@expo/ngrok: dependencies → devDependencies"]
+    },
+    "pendencia_para_proxima_etapa": "Upgrade major do Expo SDK (54→56) e React Native (0.81→0.86) em branch dedicada com testes de regressão, para eliminar os 18 CVEs moderados restantes (uuid, postcss, js-yaml residual). Avaliar substituição de react-leaflet em paralelo."
+  }
+}

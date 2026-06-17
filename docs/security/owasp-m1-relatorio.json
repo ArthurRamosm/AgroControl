@@ -1,0 +1,131 @@
+{
+  "categoria_owasp": "M1 - Improper Credential Usage (OWASP Mobile Top 10 2024)",
+  "projeto": "AgroControl",
+  "data_analise": "2026-06-16",
+  "data_correcao": "2026-06-16",
+  "metodo": "Análise estática manual do código-fonte (grep/leitura) do app React Native/Expo, scripts de teste E2E e backend .NET (AgroControl.API).",
+  "achados": [
+    {
+      "id": "M1-01",
+      "categoria": "Armazenamento de senha em texto plano (offline)",
+      "arquivo": "src/services/session.ts",
+      "linha": "17-18, 70-78",
+      "risco": "Crítico",
+      "status": "Corrigido",
+      "evidencia": "const PASSWORD_KEY = '@agrocontrol:senha';\n\nexport async function savePasswordForOffline(senha: string): Promise<void> {\n  await AsyncStorage.setItem(PASSWORD_KEY, senha);\n}\n\nexport async function verifyPasswordOffline(senha: string): Promise<boolean> {\n  const stored = await AsyncStorage.getItem(PASSWORD_KEY);\n  return stored === senha;\n}\n\nChamado em src/screens/LoginScreen.tsx:61 (await savePasswordForOffline(senha.trim())) e em src/screens/ConfiguracoesScreen.tsx:147 (após troca de senha) e :169 (comparação em texto plano para confirmar logout).",
+      "causa": "A senha do usuário é persistida sem qualquer criptografia ou hashing usando AsyncStorage, que no React Native grava dados em texto plano (SharedPreferences/arquivo XML no Android, plist no iOS, e localStorage não criptografado no Expo Web). A intenção (permitir confirmação de senha offline ao sair) foi implementada armazenando o segredo bruto em vez de um hash local (ex.: PBKDF2/Argon2) ou usando keystore seguro do dispositivo.",
+      "correcao": "1) Nunca persistir a senha em texto plano. Se a confirmação offline for um requisito de produto, armazenar apenas um hash salgado (ex.: expo-crypto + PBKDF2, ou bcrypt server-side) e comparar hashes — nunca o valor original.\n2) Se ainda assim for necessário guardar algo reversível, usar `expo-secure-store` (Keychain/Keystore) em vez de AsyncStorage, pois oferece armazenamento criptografado pelo SO.\n3) Idealmente, eliminar a necessidade de senha offline: usar um token de sessão de curta duração armazenado de forma segura (SecureStore) e exigir reautenticação biométrica (expo-local-authentication) para confirmar o logout.\n\nExemplo seguro:\n```ts\nimport * as SecureStore from 'expo-secure-store';\nimport * as Crypto from 'expo-crypto';\n\nasync function savePasswordHashForOffline(senha: string) {\n  const hash = await Crypto.digestStringAsync(\n    Crypto.CryptoDigestAlgorithm.SHA256,\n    senha + LOCAL_SALT\n  );\n  await SecureStore.setItemAsync('agrocontrol_senha_hash', hash);\n}\n\nasync function verifyPasswordOffline(senha: string): Promise<boolean> {\n  const hash = await Crypto.digestStringAsync(\n    Crypto.CryptoDigestAlgorithm.SHA256,\n    senha + LOCAL_SALT\n  );\n  const stored = await SecureStore.getItemAsync('agrocontrol_senha_hash');\n  return stored === hash;\n}\n```",
+      "correcao_aplicada": {
+        "resumo": "Senha em texto plano substituída por hash SHA-256 salgado, armazenado em expo-secure-store em vez de AsyncStorage.",
+        "arquivos_alterados": ["src/services/session.ts"],
+        "detalhes": "savePasswordForOffline() agora calcula `digestStringAsync(SHA256, LOCAL_SALT + senha)` via expo-crypto e grava apenas o hash com SecureStore.setItemAsync('agrocontrol_senha_hash', hash). verifyPasswordOffline() recalcula o hash da senha informada e compara com o valor salvo — o valor original da senha nunca é persistido no dispositivo. clearPersistedSession() agora remove a chave do SecureStore (SecureStore.deleteItemAsync) em vez do AsyncStorage.multiRemove anterior.",
+        "dependencias_adicionadas": ["expo-secure-store", "expo-crypto"]
+      }
+    },
+    {
+      "id": "M1-02",
+      "categoria": "Dados de sessão sensíveis sem criptografia (AsyncStorage)",
+      "arquivo": "src/services/session.ts",
+      "linha": "36-39, 56-61",
+      "risco": "Médio",
+      "status": "Corrigido",
+      "evidencia": "export async function saveSession(s: Session): Promise<void> {\n  _session = s;\n  await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(s));\n}\n\nexport async function updateSession(updates: Partial<Session>): Promise<void> {\n  ...\n  await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(_session));\n}",
+      "causa": "Objeto de sessão (id, nome, usuário, e-mail, propriedadeId e dados da propriedade) é serializado e gravado em AsyncStorage sem criptografia. Embora não contenha a senha diretamente, esses dados (especialmente `propriedadeId`) são usados como identificador de autorização em todas as chamadas de API (ver M1-03), tornando seu vazamento equivalente ao roubo de uma credencial de acesso aos dados daquela propriedade.",
+      "causa_raiz": "Uso de AsyncStorage (não criptografado) para qualquer dado que funcione como identificador de autorização, em vez de armazenamento seguro nativo.",
+      "correcao": "Migrar a persistência de sessão para `expo-secure-store`, que usa Keychain (iOS) e Keystore/EncryptedSharedPreferences (Android). Caso o volume de dados exceda os limites do SecureStore, criptografar o payload (ex.: AES-GCM com chave derivada e guardada no SecureStore) antes de gravar no AsyncStorage.\n\nExemplo:\n```ts\nimport * as SecureStore from 'expo-secure-store';\n\nexport async function saveSession(s: Session) {\n  _session = s;\n  await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(s));\n}\n```",
+      "correcao_aplicada": {
+        "resumo": "saveSession, loadSavedSession, updateSession e clearPersistedSession migrados de AsyncStorage para expo-secure-store.",
+        "arquivos_alterados": ["src/services/session.ts"],
+        "detalhes": "Todas as chamadas a AsyncStorage.setItem/getItem/multiRemove para a chave de sessão foram substituídas por SecureStore.setItemAsync/getItemAsync/deleteItemAsync. O objeto de sessão (incluindo propriedadeId) agora é protegido pelo Keychain (iOS) / Keystore (Android) em vez de ficar em texto plano no armazenamento do app.",
+        "observacao": "Tamanho do payload de sessão verificado como bem abaixo do limite de ~2048 bytes por item do SecureStore no Android."
+      }
+    },
+    {
+      "id": "M1-03",
+      "categoria": "Ausência de credencial/token nas chamadas autenticadas à API (uso impróprio de credenciais)",
+      "arquivo": "src/config/api.ts, src/services/syncService.ts",
+      "linha": "src/config/api.ts:17-30; src/services/syncService.ts:22,33,40,47,54,61,67,70,72,78,84,123",
+      "risco": "Crítico",
+      "status": "Pendente",
+      "evidencia": "// src/config/api.ts\nasync function request<T>(method: string, path: string, body?: unknown, options?: ApiOptions): Promise<T> {\n  const headers: Record<string, string> = {\n    'bypass-tunnel-reminder': 'true',\n  };\n  ...\n  const response = await fetch(`${API_URL}${path}`, { method, headers, body, signal: options?.signal });\n  ...\n}\n\n// src/services/syncService.ts\nawait api.post(`/api/animais/${animalId}/eventos?propriedadeId=${pid ?? session.propriedadeId}`, body);",
+      "causa": "Após o login (`POST /api/auth/login`), o app não recebe nem envia nenhum token de sessão (JWT, cookie de sessão, API key) nas requisições subsequentes. Toda 'autorização' é feita enviando o `propriedadeId` (um inteiro previsível) como parâmetro de query/body. Isso é uma forma de uso impróprio de credenciais: o app trata um identificador de recurso como se fosse uma credencial de autenticação. Qualquer cliente que descubra ou itere `propriedadeId` pode ler/gravar dados de outra propriedade sem apresentar nenhuma credencial válida (ver também OWASP M1 'missing/insecure credential transmission' e risco correlato de IDOR/M6).",
+      "correcao": "Implementar autenticação baseada em token (JWT ou opaco) emitido pelo backend no login, enviado em `Authorization: Bearer <token>` em todas as chamadas, e validado/expirado no servidor. Armazenar o token com `expo-secure-store`, nunca em AsyncStorage. Nunca usar `propriedadeId` enviado pelo cliente como prova de autorização — o backend deve derivar o `propriedadeId` do token validado.\n\nExemplo:\n```ts\nimport * as SecureStore from 'expo-secure-store';\n\nasync function request<T>(method: string, path: string, body?: unknown) {\n  const token = await SecureStore.getItemAsync('access_token');\n  const headers: Record<string, string> = {\n    'Content-Type': 'application/json',\n    ...(token ? { Authorization: `Bearer ${token}` } : {}),\n  };\n  const response = await fetch(`${API_URL}${path}`, { method, headers, body: body && JSON.stringify(body) });\n  if (response.status === 401) { /* forçar novo login */ }\n  ...\n}\n```",
+      "motivo_pendencia": "Decisão explícita do time (2026-06-16): corrigir agora apenas o armazenamento de credenciais (M1-01, M1-02, M1-06) e os achados de baixo risco (M1-04, M1-05). A correção completa de M1-03 exige emitir/validar JWT no backend, adicionar [Authorize] em todos os controllers (AnimaisController, FinanceiroController, SaudeController, etc.) e reescrever a derivação de propriedadeId a partir do token em vez do valor enviado pelo cliente — mudança de maior escopo e risco de regressão, a ser feita em uma etapa dedicada com testes de integração."
+    },
+    {
+      "id": "M1-04",
+      "categoria": "Credenciais de teste hardcoded em script E2E",
+      "arquivo": "e2e/fixtures/auth.ts",
+      "linha": "32-33",
+      "risco": "Baixo",
+      "status": "Corrigido",
+      "evidencia": "await page.getByPlaceholder('Usuário').fill(process.env.TEST_USER ?? 'demo');\nawait page.getByPlaceholder('Senha').fill(process.env.TEST_PASS ?? 'demo123');",
+      "causa": "Fallback de credenciais fixas ('demo'/'demo123') no setup global do Playwright, usado quando as variáveis de ambiente TEST_USER/TEST_PASS não estão definidas. Não é uma credencial de produção, mas se a conta 'demo' existir em um ambiente real (não isolado), fica exposta no repositório.",
+      "correcao": "Remover o fallback fixo e falhar explicitamente se as variáveis de ambiente não estiverem definidas, garantindo que a conta de teste só exista em ambiente de QA isolado:\n```ts\nconst user = process.env.TEST_USER;\nconst pass = process.env.TEST_PASS;\nif (!user || !pass) throw new Error('Defina TEST_USER e TEST_PASS para rodar os testes E2E.');\n```\nGarantir também que a conta 'demo' nunca exista em produção.",
+      "correcao_aplicada": {
+        "resumo": "Fallback 'demo'/'demo123' removido; globalSetup agora lança erro explícito se TEST_USER/TEST_PASS não estiverem definidos.",
+        "arquivos_alterados": ["e2e/fixtures/auth.ts"],
+        "detalhes": "process.env.TEST_USER e process.env.TEST_PASS são lidos sem fallback; se ausentes, a função lança Error antes de abrir o browser, impedindo execução do E2E com credencial fixa implícita."
+      }
+    },
+    {
+      "id": "M1-05",
+      "categoria": "Log de informação de sessão em console (E2E)",
+      "arquivo": "e2e/fixtures/auth.ts",
+      "linha": "41",
+      "risco": "Baixo",
+      "status": "Corrigido",
+      "evidencia": "console.log(`[auth] storageState gravado em ${STORAGE_STATE}`);",
+      "causa": "Loga apenas o caminho do arquivo de storageState, não o conteúdo do token/sessão. Risco baixo, mas o arquivo `e2e/.auth/session.json` gerado contém o storageState completo (incluindo localStorage com a sessão) e deve ser tratado como segredo.",
+      "correcao": "Confirmar que `e2e/.auth/` está no .gitignore (evitar commit do arquivo de sessão) e evitar logar caminhos de artefatos sensíveis em pipelines de CI compartilhados. Adicionar `e2e/.auth/` ao `.gitignore` caso ainda não esteja.",
+      "correcao_aplicada": {
+        "resumo": "Entrada `/e2e/.auth/` adicionada ao .gitignore para garantir que o storageState (sessão completa) nunca seja versionado.",
+        "arquivos_alterados": [".gitignore"],
+        "detalhes": "O repositório já ignorava /playwright/.auth/, mas não o diretório real usado por este projeto (e2e/.auth/). O log do caminho do arquivo foi mantido (não expõe segredo), mas o arquivo gerado agora está garantidamente fora do controle de versão."
+      }
+    },
+    {
+      "id": "M1-06",
+      "categoria": "Senha armazenada e comparada em texto plano no backend",
+      "arquivo": "AgroControl.API/Services/AuthService.cs, AgroControl.API/Controllers/AuthController.cs",
+      "linha": "AuthService.cs:16-21 (antes da correção); AuthController.cs:92 (Register), 140-143 (AlterarSenha)",
+      "risco": "Crítico",
+      "status": "Corrigido",
+      "evidencia": "// AuthService.cs (antes)\nvar usuario = await _db.Usuarios\n    .Include(u => u.Propriedade)\n    .FirstOrDefaultAsync(u => u.NomeUsuario == request.Usuario\n                           && u.Senha == request.Senha);\n\n// AuthController.cs (antes)\nSenha = request.Senha, // Register\n...\nif (usuario.Senha != request.SenhaAtual) // AlterarSenha\n    return BadRequest(...);\nusuario.Senha = request.NovaSenha;",
+      "causa": "Achado durante a investigação do M1-03: o backend nunca aplicava hashing à senha. O registro gravava `request.Senha` diretamente na coluna `Usuario.Senha`, o login comparava a senha informada por igualdade de string contra o valor armazenado, e a troca de senha repetia o mesmo padrão. Isso significa que qualquer acesso de leitura ao banco de dados (dump, backup, injeção de SQL, acesso indevido de operador) expõe a senha real de todos os usuários — a causa raiz do M1-01 no app é um reflexo deste problema no servidor.",
+      "correcao": "Adicionar hashing de senha (BCrypt/Argon2) no backend: gerar hash no registro e na troca de senha, e verificar com a função de comparação da biblioteca (nunca por igualdade de string) no login.",
+      "correcao_aplicada": {
+        "resumo": "Senhas agora são armazenadas como hash BCrypt. Login, registro e troca de senha usam BCrypt.Net-Next; contas legadas em texto plano são migradas automaticamente para hash no primeiro login bem-sucedido após o deploy.",
+        "arquivos_alterados": [
+          "AgroControl.API/AgroControl.API.csproj",
+          "AgroControl.API/Services/AuthService.cs",
+          "AgroControl.API/Controllers/AuthController.cs"
+        ],
+        "detalhes": "1) Pacote NuGet BCrypt.Net-Next 4.2.0 adicionado ao projeto.\n2) AuthService ganhou os métodos estáticos GerarHash(senha), EhHashBcrypt(valor) e VerificarSenha(senhaInformada, senhaArmazenada).\n3) LoginAsync agora busca o usuário apenas por NomeUsuario (sem comparar Senha na query) e usa VerificarSenha() para validar; se a senha armazenada ainda não for um hash BCrypt (conta legada), valida por igualdade e, em caso de sucesso, re-grava a senha como hash BCrypt (migração transparente, sem exigir reset manual de senha dos usuários existentes).\n4) AuthController.Register agora grava `Senha = AuthService.GerarHash(request.Senha)` em vez do valor bruto.\n5) AuthController.AlterarSenha agora usa AuthService.VerificarSenha() para validar a senha atual e AuthService.GerarHash() para gravar a nova senha.",
+        "validacao": "dotnet build executado com sucesso (0 erros) após as alterações."
+      }
+    }
+  ],
+  "pontos_positivos": [
+    "Nenhum arquivo .env, certificado (.pem/.key/.p12) ou chave privada encontrado versionado no repositório git.",
+    "Nenhuma API key ou token de terceiros hardcoded encontrado em código-fonte ou JSON de configuração (app.json, eas.json).",
+    "Senha do usuário não é persistida no banco SQLite local (src/database/localDb.ts)."
+  ],
+  "resumo_risco": {
+    "critico": 3,
+    "alto": 0,
+    "medio": 1,
+    "baixo": 2
+  },
+  "resumo_correcoes": {
+    "corrigidos": ["M1-01", "M1-02", "M1-04", "M1-05", "M1-06"],
+    "pendentes": ["M1-03"],
+    "validacao_geral": {
+      "frontend": "npx tsc --noEmit executado antes e depois das alterações: 40 erros pré-existentes em ambos os casos (nenhum erro novo introduzido pelas correções; nenhum erro relacionado a session.ts ou auth.ts).",
+      "backend": "dotnet build executado após as alterações: compilação concluída com sucesso, 0 erros (4 avisos pré-existentes não relacionados a esta correção).",
+      "dependencias_frontend_adicionadas": ["expo-secure-store", "expo-crypto"],
+      "dependencias_backend_adicionadas": ["BCrypt.Net-Next 4.2.0"]
+    },
+    "pendencia_critica_para_proxima_etapa": "M1-03: implementar emissão/validação de JWT no backend (todos os controllers) e enviar 'Authorization: Bearer <token>' no app, eliminando a dependência do propriedadeId enviado pelo cliente como prova de autorização."
+  }
+}

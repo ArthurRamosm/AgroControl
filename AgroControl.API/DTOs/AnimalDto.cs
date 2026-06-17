@@ -79,6 +79,10 @@ public class CadastrarAnimalDto
 public class CadastrarAnimalFotoDto
 {
     [Required(ErrorMessage = "Foto é obrigatória")]
+    // [OWASP M4-02] Limite generoso (~9MB de imagem decodificada) para
+    // bloquear payloads abusivos sem rejeitar fotos legítimas comprimidas
+    // pelo app (expo-image-picker, quality: 0.7).
+    [MaxLength(12_000_000, ErrorMessage = "Foto excede o tamanho máximo permitido.")]
     public string FotoBase64 { get; set; } = string.Empty;
 
     [Range(1, 3, ErrorMessage = "Ordem da foto deve estar entre 1 e 3")]

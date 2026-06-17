@@ -13,9 +13,11 @@
       "backgroundColor": "#0d2b10"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "jsEngine": "hermes"
     },
     "android": {
+      "allowBackup": false,
       "icon": "./assets/LogoApp.png",
       "adaptiveIcon": {
         "foregroundImage": "./assets/LogoApp.png",
@@ -40,7 +42,13 @@
       }
     },
     "plugins": [
-      "expo-image-picker",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "O AgroControl usa sua galeria para você selecionar fotos dos animais cadastrados na ficha zootécnica.",
+          "cameraPermission": "O AgroControl usa a câmera para fotografar animais no momento do cadastro."
+        }
+      ],
       "expo-sqlite",
       [
         "expo-build-properties",
@@ -49,11 +57,12 @@
             "compileSdkVersion": 35,
             "targetSdkVersion": 35,
             "minSdkVersion": 24,
-            "enableProguardInReleaseBuilds": false,
-            "enableShrinkResourcesInReleaseBuilds": false
+            "enableProguardInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
           }
         }
-      ]
+      ],
+      "expo-secure-store"
     ]
   }
 }

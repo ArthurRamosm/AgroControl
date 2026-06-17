@@ -74,6 +74,8 @@ export default function RegisterScreen({ navigation }: Props) {
   const [confirmarSenhaVisivel, setConfirmarSenhaVisivel] = useState(false);
   const [erros, setErros] = useState<Erros>({});
   const [erroGeral, setErroGeral] = useState('');
+  const [aceiteTermos, setAceiteTermos] = useState(false);
+  const [aceiteTermosErro, setAceiteTermosErro] = useState('');
   const [sucesso, setSucesso] = useState(false);
   const [nomeRegistrado, setNomeRegistrado] = useState('');
 
@@ -110,6 +112,11 @@ export default function RegisterScreen({ navigation }: Props) {
   async function handleCadastrar() {
     if (carregando) return;
     setErroGeral('');
+    setAceiteTermosErro('');
+    if (!aceiteTermos) {
+      setAceiteTermosErro('Você deve aceitar a Política de Privacidade para continuar.');
+      return;
+    }
     if (!validar()) return;
     setCarregando(true);
     try {
@@ -291,6 +298,9 @@ export default function RegisterScreen({ navigation }: Props) {
                 placeholder=""
                 placeholderTextColor="#bbb"
                 autoCapitalize="none"
+                autoCorrect={false}
+                textContentType="username"
+                autoComplete="username"
                 value={usuario}
                 onChangeText={t => { setUsuario(t); limparErro('usuario'); }}
               />
@@ -308,6 +318,9 @@ export default function RegisterScreen({ navigation }: Props) {
                 placeholder="Senha"
                 placeholderTextColor="#bbb"
                 secureTextEntry={!senhaVisivel}
+                autoCorrect={false}
+                textContentType="newPassword"
+                autoComplete="new-password"
                 value={senha}
                 onChangeText={t => { setSenha(t); limparErro('senha'); }}
               />
@@ -335,6 +348,9 @@ export default function RegisterScreen({ navigation }: Props) {
                 placeholder="Confirmar Senha"
                 placeholderTextColor="#bbb"
                 secureTextEntry={!confirmarSenhaVisivel}
+                autoCorrect={false}
+                textContentType="newPassword"
+                autoComplete="new-password"
                 value={confirmarSenha}
                 onChangeText={t => { setConfirmarSenha(t); limparErro('confirmarSenha'); }}
               />
@@ -353,6 +369,24 @@ export default function RegisterScreen({ navigation }: Props) {
           </View>
 
           {erroGeral ? <Text style={styles.erroGeral}>{erroGeral}</Text> : null}
+
+          {/* ── Consentimento LGPD (M6-01) ── */}
+          <TouchableOpacity
+            testID="checkbox-aceite-termos"
+            style={styles.checkboxRow}
+            onPress={() => { setAceiteTermos(v => !v); setAceiteTermosErro(''); }}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.checkboxBox, aceiteTermos && styles.checkboxBoxChecked]}>
+              {aceiteTermos && <Ionicons name="checkmark" size={14} color="#fff" />}
+            </View>
+            <Text style={styles.checkboxText}>
+              Ao criar sua conta, você concorda com nossa{' '}
+              <Text style={styles.checkboxLink}>Política de Privacidade</Text>
+              {' '}e autoriza o tratamento dos seus dados conforme a LGPD (Lei 13.709/2020).
+            </Text>
+          </TouchableOpacity>
+          {aceiteTermosErro ? <Text style={styles.erro}>{aceiteTermosErro}</Text> : null}
 
           <TouchableOpacity
             testID="btn-registrar"
@@ -555,6 +589,39 @@ const styles = StyleSheet.create({
     color: PRIMARY,
     fontWeight: '600',
     fontSize: 14,
+  },
+  // ── Consentimento LGPD ──
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginBottom: 8,
+    marginTop: 4,
+  },
+  checkboxBox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: PRIMARY,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+    flexShrink: 0,
+  },
+  checkboxBoxChecked: {
+    backgroundColor: PRIMARY,
+  },
+  checkboxText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#555',
+    lineHeight: 18,
+  },
+  checkboxLink: {
+    color: PRIMARY,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
   // ── Modal ──
   modalFundo: {

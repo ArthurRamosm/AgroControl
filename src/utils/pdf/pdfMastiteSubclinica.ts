@@ -1,5 +1,6 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
 import * as SQLite from 'expo-sqlite';
 import { Platform } from 'react-native';
 
@@ -252,12 +253,16 @@ export async function gerarPdfMastiteSubclinica(
   const { uri } = await Print.printToFileAsync({ html });
 
   const dataPad = sessao.data_teste ?? pad2(new Date().getDate());
-  const podeCompartilhar = await Sharing.isAvailableAsync();
-  if (podeCompartilhar) {
-    await Sharing.shareAsync(uri, {
-      mimeType: 'application/pdf',
-      dialogTitle: `Mastite Subclínica – ${dataPad}`,
-      UTI: 'com.adobe.pdf',
-    });
+  try {
+    const podeCompartilhar = await Sharing.isAvailableAsync();
+    if (podeCompartilhar) {
+      await Sharing.shareAsync(uri, {
+        mimeType: 'application/pdf',
+        dialogTitle: `Mastite Subclínica – ${dataPad}`,
+        UTI: 'com.adobe.pdf',
+      });
+    }
+  } finally {
+    await FileSystem.deleteAsync(uri, { idempotent: true });
   }
 }

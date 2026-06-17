@@ -8,7 +8,11 @@
       "PowerShell(& \".specify/scripts/powershell/check-prerequisites.ps1\" -Json -RequireTasks -IncludeTasks)",
       "PowerShell(& \".specify/extensions/git/scripts/powershell/auto-commit.ps1\" \"after_implement\")",
       "Bash(npx playwright *)",
-      "Bash(curl -s --max-time 5 http://localhost:8081 -o /dev/null -w \"%{http_code}\")"
+      "Bash(curl -s --max-time 5 http://localhost:8081 -o /dev/null -w \"%{http_code}\")",
+      "Bash(curl -s -i -X POST http://localhost:5249/api/auth/login -H \"Content-Type: application/json\" -d '{\"usuario\":\"demo\",\"senha\":\"demo123\"}' --max-time 5)",
+      "Bash(xargs grep -niE \"senha|password|email|cpf|telefone\")",
+      "PowerShell(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('c:/Users/arthu/AgroControl/docs/security/owasp-m7-relatorio.json','utf8'\\)\\); console.log\\('JSON v�lido'\\)\")",
+      "PowerShell(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('c:/Users/arthu/AgroControl/docs/security/owasp-m8-relatorio.json','utf8'\\)\\); console.log\\('JSON valido'\\)\")"
     ]
   }
 }

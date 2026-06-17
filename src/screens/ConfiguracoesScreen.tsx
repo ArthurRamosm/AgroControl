@@ -158,6 +158,7 @@ export default function ConfiguracoesScreen({ navigation }: Props) {
 
   // ── Modal: Confirmar Sair ────────────────────────────────────────────────
   const [showSairModal, setShowSairModal] = useState(false);
+
   const [senhaConfirm, setSenhaConfirm] = useState('');
   const [sairErro, setSairErro] = useState('');
   const [sairCarregando, setSairCarregando] = useState(false);
@@ -171,6 +172,29 @@ export default function ConfiguracoesScreen({ navigation }: Props) {
     if (!ok) { setSairErro('Senha incorreta.'); return; }
     await clearPersistedSession();
     navigation.replace('Login');
+  }
+
+  // ── Modal: Excluir Conta ─────────────────────────────────────────────────
+  const [showExcluirModal, setShowExcluirModal] = useState(false);
+  const [senhaExcluir, setSenhaExcluir] = useState('');
+  const [excluirErro, setExcluirErro] = useState('');
+  const [excluirCarregando, setExcluirCarregando] = useState(false);
+
+  async function handleExcluirConta() {
+    if (!senhaExcluir) { setExcluirErro('Digite sua senha para confirmar.'); return; }
+    setExcluirCarregando(true);
+    setExcluirErro('');
+    try {
+      const senhaOk = await verifyPasswordOffline(senhaExcluir);
+      if (!senhaOk) { setExcluirErro('Senha incorreta.'); setExcluirCarregando(false); return; }
+      await api.deleteWithBody('/api/auth/conta', { usuarioId: getSession().id, senha: senhaExcluir });
+      await clearPersistedSession();
+      navigation.replace('Login');
+    } catch (error) {
+      setExcluirErro(getMensagemErro(error));
+    } finally {
+      setExcluirCarregando(false);
+    }
   }
 
   const propriedadeNome = initial.propriedade.nome;
@@ -267,6 +291,26 @@ export default function ConfiguracoesScreen({ navigation }: Props) {
               </View>
               <Text {...noTranslateProps} style={[styles.menuItemText, styles.menuItemTextSair]}>
                 Sair da Conta
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#bbb" />
+          </TouchableOpacity>
+        </View>
+
+        {/* ── Seção Zona de Perigo ── */}
+        <Text {...noTranslateProps} style={styles.secaoLabel}>ZONA DE PERIGO</Text>
+        <View style={styles.card}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            activeOpacity={0.75}
+            onPress={() => { setSenhaExcluir(''); setExcluirErro(''); setShowExcluirModal(true); }}
+          >
+            <View style={styles.menuItemLeft}>
+              <View style={[styles.menuIcon, { backgroundColor: '#fdecea' }]}>
+                <Ionicons name="trash-outline" size={18} color="#c62828" />
+              </View>
+              <Text {...noTranslateProps} style={[styles.menuItemText, styles.menuItemTextSair]}>
+                Excluir Conta
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color="#bbb" />
@@ -382,6 +426,9 @@ export default function ConfiguracoesScreen({ navigation }: Props) {
               value={senhaAtual}
               onChangeText={t => { setSenhaAtual(t); setSenhaErro(''); }}
               secureTextEntry
+              autoCorrect={false}
+              textContentType="password"
+              autoComplete="current-password"
               placeholder="Senha atual"
               placeholderTextColor="#bbb"
             />
@@ -392,6 +439,9 @@ export default function ConfiguracoesScreen({ navigation }: Props) {
               value={novaSenha}
               onChangeText={t => { setNovaSenha(t); setSenhaErro(''); }}
               secureTextEntry
+              autoCorrect={false}
+              textContentType="newPassword"
+              autoComplete="new-password"
               placeholder="Nova senha"
               placeholderTextColor="#bbb"
             />
@@ -402,6 +452,9 @@ export default function ConfiguracoesScreen({ navigation }: Props) {
               value={confirmarSenha}
               onChangeText={t => { setConfirmarSenha(t); setSenhaErro(''); }}
               secureTextEntry
+              autoCorrect={false}
+              textContentType="newPassword"
+              autoComplete="new-password"
               placeholder="Confirmar nova senha"
               placeholderTextColor="#bbb"
             />
@@ -446,6 +499,9 @@ export default function ConfiguracoesScreen({ navigation }: Props) {
               value={senhaConfirm}
               onChangeText={t => { setSenhaConfirm(t); setSairErro(''); }}
               secureTextEntry
+              autoCorrect={false}
+              textContentType="password"
+              autoComplete="current-password"
               placeholder="Digite sua senha"
               placeholderTextColor="#bbb"
             />
@@ -468,6 +524,53 @@ export default function ConfiguracoesScreen({ navigation }: Props) {
                 {sairCarregando
                   ? <ActivityIndicator color="#fff" size="small" />
                   : <Text style={styles.modalBtnSalvarText}>Confirmar e Sair</Text>
+                }
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ══ Modal: Excluir Conta ══ */}
+      <Modal visible={showExcluirModal} transparent animationType="slide" onRequestClose={() => setShowExcluirModal(false)}>
+        <View style={styles.overlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Excluir Conta</Text>
+            <Text style={styles.modalDescricao}>
+              Esta ação é irreversível. Seus dados pessoais serão removidos conforme a LGPD (Art. 18, VI).
+            </Text>
+
+            <Text style={styles.fieldLabel}>Confirme sua senha</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={senhaExcluir}
+              onChangeText={t => { setSenhaExcluir(t); setExcluirErro(''); }}
+              secureTextEntry
+              autoCorrect={false}
+              textContentType="password"
+              autoComplete="current-password"
+              placeholder="Digite sua senha"
+              placeholderTextColor="#bbb"
+            />
+
+            {excluirErro ? <Text style={styles.erroTexto}>{excluirErro}</Text> : null}
+
+            <View style={styles.modalBtns}>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalBtnCancelar]}
+                onPress={() => setShowExcluirModal(false)}
+                disabled={excluirCarregando}
+              >
+                <Text style={styles.modalBtnCancelarText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, { backgroundColor: '#c62828', flex: 1 }]}
+                onPress={handleExcluirConta}
+                disabled={excluirCarregando}
+              >
+                {excluirCarregando
+                  ? <ActivityIndicator color="#fff" size="small" />
+                  : <Text style={styles.modalBtnSalvarText}>Excluir Conta</Text>
                 }
               </TouchableOpacity>
             </View>

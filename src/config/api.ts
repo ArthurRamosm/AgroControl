@@ -49,6 +49,9 @@ export const api = {
 
   delete: <T>(path: string, options?: ApiOptions) =>
     request<T>('DELETE', path, undefined, options),
+
+  deleteWithBody: <T>(path: string, body: unknown, options?: ApiOptions) =>
+    request<T>('DELETE', path, body, options),
 };
 
 export function getMensagemErro(error: unknown): string {

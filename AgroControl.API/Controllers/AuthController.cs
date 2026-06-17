@@ -1,5 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Cryptography;
+using System.Text;
 using AgroControl.API.Data;
 using AgroControl.API.DTOs;
 using AgroControl.API.Models;
@@ -9,6 +12,7 @@ namespace AgroControl.API.Controllers;
 
 [ApiController]
 [Route("api/auth")]
+[EnableRateLimiting("auth")]
 public class AuthController(AuthService authService, AppDbContext db, ILogger<AuthController> logger) : ControllerBase
 {
     private readonly AuthService _authService = authService;
@@ -22,7 +26,7 @@ public class AuthController(AuthService authService, AppDbContext db, ILogger<Au
         if (!ModelState.IsValid)
             return BadRequest(new LoginResponseDto { Sucesso = false, Mensagem = "Usuário e senha são obrigatórios." });
 
-        _logger.LogInformation("Tentativa de login para usuário: {Usuario}", request.Usuario);
+        _logger.LogInformation("Tentativa de login para usuário hash={UsuarioHash}", HashLog(request.Usuario));
         var resultado = await _authService.LoginAsync(request);
 
         if (!resultado.Sucesso)
@@ -31,7 +35,7 @@ public class AuthController(AuthService authService, AppDbContext db, ILogger<Au
             return Unauthorized(resultado);
         }
 
-        _logger.LogInformation("Login bem-sucedido para usuário: {Usuario}", request.Usuario);
+        _logger.LogInformation("Login bem-sucedido para usuário hash={UsuarioHash}", HashLog(request.Usuario));
         return Ok(resultado);
     }
 
@@ -73,7 +77,7 @@ public class AuthController(AuthService authService, AppDbContext db, ILogger<Au
             });
         }
 
-        _logger.LogInformation("Registrando novo usuário: {Usuario}", request.Usuario);
+        _logger.LogInformation("Registrando novo usuário hash={UsuarioHash}", HashLog(request.Usuario));
 
         var propriedade = new Propriedade
         {
@@ -89,14 +93,15 @@ public class AuthController(AuthService authService, AppDbContext db, ILogger<Au
             Nome = request.Nome.Trim(),
             Email = request.Email.Trim().ToLower(),
             NomeUsuario = request.Usuario.Trim().ToLower(),
-            Senha = request.Senha,
+            // [OWASP M1] Senha nunca é gravada em texto plano — ver AuthService.GerarHash.
+            Senha = AuthService.GerarHash(request.Senha),
             PropriedadeId = propriedade.Id
         };
         _db.Usuarios.Add(usuario);
         await _db.SaveChangesAsync();
 
-        _logger.LogInformation("Usuário {Usuario} cadastrado com sucesso (PropriedadeId: {PropriedadeId})",
-            usuario.NomeUsuario, propriedade.Id);
+        _logger.LogInformation("Usuário hash={UsuarioHash} cadastrado com sucesso (PropriedadeId: {PropriedadeId})",
+            HashLog(usuario.NomeUsuario), propriedade.Id);
 
         return Ok(new RegisterResponseDto
         {
@@ -137,11 +142,46 @@ public class AuthController(AuthService authService, AppDbContext db, ILogger<Au
         if (usuario is null)
             return NotFound(new { sucesso = false, mensagem = "Usuário não encontrado." });
 
-        if (usuario.Senha != request.SenhaAtual)
+        // [OWASP M1] Verifica contra hash BCrypt (com compatibilidade legada)
+        // e grava a nova senha sempre como hash.
+        if (!AuthService.VerificarSenha(request.SenhaAtual, usuario.Senha))
             return BadRequest(new { sucesso = false, mensagem = "Senha atual incorreta." });
 
-        usuario.Senha = request.NovaSenha;
+        usuario.Senha = AuthService.GerarHash(request.NovaSenha);
         await _db.SaveChangesAsync();
         return Ok(new { sucesso = true, mensagem = "Senha alterada com sucesso." });
     }
+
+    // DELETE /api/auth/conta
+    // [OWASP M6-03 / LGPD Art. 18 VI] Direito à exclusão dos dados pessoais.
+    // Usa anonimização (Art. 12 LGPD) em vez de hard-delete para preservar
+    // integridade referencial das FKs de dados operacionais (financeiro, produção).
+    [HttpDelete("conta")]
+    public async Task<IActionResult> ExcluirConta([FromBody] ExcluirContaDto request)
+    {
+        var usuario = await _db.Usuarios.FindAsync(request.UsuarioId);
+        if (usuario is null)
+            return NotFound(new { sucesso = false, mensagem = "Usuário não encontrado." });
+
+        if (!AuthService.VerificarSenha(request.Senha, usuario.Senha))
+            return BadRequest(new { sucesso = false, mensagem = "Senha incorreta." });
+
+        _logger.LogInformation("Exclusão de conta solicitada para hash={UsuarioHash}", HashLog(usuario.NomeUsuario));
+
+        usuario.Nome = "Conta Excluída";
+        usuario.Email = $"excluido-{usuario.Id}@removido.local";
+        usuario.NomeUsuario = $"excluido-{usuario.Id}";
+        usuario.Senha = Convert.ToHexString(SHA256.HashData(Guid.NewGuid().ToByteArray()));
+
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation("Conta anonimizada (LGPD Art. 12) para Id={UsuarioId}", usuario.Id);
+
+        return Ok(new { sucesso = true, mensagem = "Conta excluída com sucesso." });
+    }
+
+    // [OWASP M6-02] Pseudonimiza identificadores em logs de INFO de longa retenção.
+    // Logs de WARNING mantêm o valor em claro para suporte a investigação de incidentes.
+    private static string HashLog(string value) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)))[..8];
 }
